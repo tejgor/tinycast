@@ -249,6 +249,11 @@ final class AppSettings {
         didSet { defaults.set(compactMode, forKey: Key.compactMode.rawValue) }
     }
 
+    /// Percent of the launcher's scrim taken off its glass: 0 is the standard tint, 100 bare glass.
+    var paletteTransparency: Int {
+        didSet { defaults.set(paletteTransparency, forKey: Key.paletteTransparency.rawValue) }
+    }
+
     /// Pin favorite app icons to the right of the compact search bar (⌘1–⌘5 to launch).
     var showFavoritesInCompactMode: Bool {
         didSet {
@@ -725,6 +730,7 @@ final class AppSettings {
             defaults.string(forKey: Key.interfaceSize.rawValue).flatMap(InterfaceSize.init)
             ?? .standard
         compactMode = defaults.bool(forKey: Key.compactMode.rawValue)
+        paletteTransparency = min(max(defaults.integer(forKey: Key.paletteTransparency.rawValue), 0), 100)
         // Defaults to true, so absence must be distinguished from a stored `false`.
         showFavoritesInCompactMode =
             defaults.object(forKey: Key.showFavoritesInCompactMode.rawValue) == nil

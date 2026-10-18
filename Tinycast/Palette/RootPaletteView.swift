@@ -339,7 +339,7 @@ struct RootPaletteView: View {
                 )
                 // The window's frame is the size source, so the glass and clip stay matched.
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                .background(Theme.Colors.panelScrim)
+                .background(Theme.Colors.panelScrim.opacity(1 - Double(settings.paletteTransparency) / 100))
                 .background(GlassEffectView())
                 .overlay {
                     Theme.Colors.dialogDimming

@@ -106,6 +106,8 @@ enum SettingsBackupCoverage {
             "Machine-local geometry: every entry names a display this Mac has, and no other one.",
         AppSettingsKey.paletteExpandedCenterDisplays.rawValue:
             "Machine-local geometry: every entry names a display this Mac has, and no other one.",
+        AppSettingsKey.paletteTransparency.rawValue:
+            "A personal-fork preference; an upstream build reading the backup has no field for it.",
         AppSettingsKey.autoSwitchInputSource.rawValue:
             "Names a keyboard input source installed on this Mac; another Mac may not have it.",
         AppSettingsKey.meetingBrowser.rawValue:

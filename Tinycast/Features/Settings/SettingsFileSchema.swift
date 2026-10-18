@@ -41,6 +41,8 @@ enum SettingsFileSchema {
         case .appearance: return bind(settings, \.appearance)
         case .interfaceSize: return bind(settings, \.interfaceSize)
         case .compactMode: return bind(settings, \.compactMode)
+        case .paletteTransparency:
+            return bind(settings, \.paletteTransparency) { (0...100).contains($0) ? $0 : nil }
         case .showFavoritesInCompactMode: return bind(settings, \.showFavoritesInCompactMode)
         case .openOnCursorScreen: return bind(settings, \.openOnCursorScreen)
         case .paletteDraggable: return bind(settings, \.paletteDraggable)

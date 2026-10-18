@@ -14,6 +14,7 @@ enum SettingsFileKey: String, CaseIterable, Sendable {
     case appearance = "appearance.theme"
     case interfaceSize = "appearance.interfaceSize"
     case compactMode = "appearance.compactMode"
+    case paletteTransparency = "appearance.transparency"
     case showFavoritesInCompactMode = "appearance.showFavoritesInCompactMode"
     case openOnCursorScreen = "appearance.followCursorAcrossDisplays"
     case paletteDraggable = "appearance.dragToReposition"

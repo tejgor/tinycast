@@ -77,6 +77,7 @@ struct GeneralSettingsView: View {
                 } label: {
                     SettingsRowTitle(.generalAppearance, "Appearance")
                 }
+                TransparencyRow()
                 InterfaceSizeRow()
                 WindowModeRow()
                 Toggle(isOn: $settings.showFavoritesInCompactMode) {
@@ -236,6 +237,32 @@ private struct WindowModeButtonStyle: ButtonStyle {
 }
 
 /// Three glyph steps read as a legend; a true-to-scale "Aa" would look identical at 1.1.
+private struct TransparencyRow: View {
+    @Environment(AppSettings.self) private var settings
+
+    var body: some View {
+        SettingsRow(
+            title: "Transparency",
+            subtitle: String(localized: "How much of what is behind the launcher shows through its glass."),
+            anchor: .generalAppearance
+        ) {
+            HStack(spacing: Theme.Spacing.md) {
+                Slider(
+                    value: Binding(
+                        get: { Double(settings.paletteTransparency) },
+                        set: { settings.paletteTransparency = Int($0.rounded()) }),
+                    in: 0...100, step: 5
+                )
+                .frame(width: 140)
+                Text(verbatim: "\(settings.paletteTransparency)%")
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+                    .frame(width: 40, alignment: .trailing)
+            }
+        }
+    }
+}
+
 private struct InterfaceSizeRow: View {
     @Environment(AppSettings.self) private var settings
 
