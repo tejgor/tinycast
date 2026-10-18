@@ -46,9 +46,10 @@ enum NoteMarkdownParser {
                     level: 0))
             indents.append(0)
         }
+        let (tableLines, tables) = tabled(lines, units: units)
         return NoteMarkdown(
-            units: units, lines: leveled(tabled(lines, units: units), indents: indents),
-            fenceBlocks: fenceBlocks)
+            units: units, lines: leveled(tableLines, indents: indents), fenceBlocks: fenceBlocks,
+            tables: tables)
     }
 
     fileprivate struct Fence {
@@ -125,8 +126,11 @@ enum NoteMarkdownParser {
     }
 
     /// A header row, a delimiter row with as many cells, then every following row with a pipe.
-    private static func tabled(_ lines: [NoteMarkdown.Line], units: [UInt16]) -> [NoteMarkdown.Line] {
+    private static func tabled(
+        _ lines: [NoteMarkdown.Line], units: [UInt16]
+    ) -> ([NoteMarkdown.Line], [NoteMarkdown.Table]) {
         var result = lines
+        var tables: [NoteMarkdown.Table] = []
         var index = 0
         while index + 1 < lines.count {
             guard lines[index].kind == .paragraph, lines[index + 1].kind == .paragraph,
@@ -143,15 +147,40 @@ enum NoteMarkdownParser {
             {
                 end += 1
             }
+            var cells: [[NSRange]] = []
             for row in index..<end {
                 let line = lines[row]
                 result[row] = NoteMarkdown.Line(
                     kind: .table, range: line.range, contentRange: line.contentRange, markerRange: nil,
                     checkboxRange: nil, level: 0)
+                guard row != index + 1, let rowCells = tableCells(of: line, in: units) else {
+                    cells.append([])
+                    continue
+                }
+                // GFM drops cells past the header's count and pads a short row with empty ones.
+                let empty = NSRange(location: NSMaxRange(line.contentRange), length: 0)
+                cells.append(
+                    (0..<header.count).map { $0 < rowCells.count ? trimmedRange(rowCells[$0]) : empty })
             }
+            tables.append(
+                NoteMarkdown.Table(
+                    lines: index...(end - 1), alignments: delimiter.map(alignment), cells: cells))
             index = end
         }
-        return result
+        return (result, tables)
+    }
+
+    private static func trimmedRange(_ cell: ArraySlice<UInt16>) -> NSRange {
+        var trimmed = cell.drop(while: Unit.isSpaceOrTab)
+        while let last = trimmed.last, Unit.isSpaceOrTab(last) { trimmed = trimmed.dropLast() }
+        return NSRange(trimmed.startIndex..<trimmed.endIndex)
+    }
+
+    private static func alignment(_ cell: ArraySlice<UInt16>) -> NoteMarkdown.Table.Alignment {
+        let range = trimmedRange(cell)
+        let leads = cell[range.location] == Unit.colon
+        let trails = cell[NSMaxRange(range) - 1] == Unit.colon
+        return leads && trails ? .center : trails ? .trailing : .leading
     }
 
     /// A row's cells split on unescaped pipes, outer pipes dropped; nil for a line with no pipe.

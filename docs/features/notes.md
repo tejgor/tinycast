@@ -164,9 +164,11 @@ It covers headings 1 to 6 (4 to 6 look like 3), bold, italic, bold italic, strik
 links, bare `http` and `https` URLs, bullet, numbered and task lists with nesting, quotes, fenced code
 blocks and horizontal rules. Inline spans never cross a line. Images, underline, HTML, setext headings,
 indented code, footnotes, reference links and blocks nested inside quotes stay plain text. A GFM table
-(a pipe row, a delimiter row with as many cells, then the pipe rows after it) also stays plain text, but
-is recognised so it gets no inline styling: it shows in the code font, with wrapped rows hanging under
-their first line, and a delimiter row typed under existing rows restyles all of them.
+(a pipe row, a delimiter row with as many cells, then the pipe rows after it) is a run of `.table` lines
+with no inline spans of their own, plus a `NoteMarkdown.Table` holding each column's alignment and each
+row's trimmed cell ranges; a short row is padded with empty cells and cells past the header's count are
+dropped. `NoteMarkdown.cell(_:)` turns a cell range into its drawn text, markers removed and `\|` read
+as a pipe, with the inline spans that style it.
 The whole note is reparsed on each edit. The AI chat's `MarkdownBlock` is a separate read-only parser
 and is not shared.
 
@@ -192,7 +194,9 @@ never shifts them; a wrapped item keeps normal line spacing. A restyle writes st
 A bullet or numbered marker becomes a list only after a space or tab; a lone `-` or `1.` stays literal.
 
 `NoteRevealPolicy` picks the lines that show raw Markdown: every line under the selection, plus both
-fences of a code block the selection is in. Nothing is revealed unless the editor is first responder in
+fences of a code block the selection is in, plus every row of a table it touches — columns size to
+all rows, so a table is edited as source all at once, in the code font with wrapped rows hanging under
+their first line. A restyle that touches one row of a table restyles all of it. Nothing is revealed unless the editor is first responder in
 the key window. Revealed markers use `textTertiary`. During a drag selection the reveal waits for
 mouse-up, because revealing moves text under the pointer. Bullets keep their dot under the caret;
 other revealed list markers keep the rendered marker's `textSecondary` colour. Revealed non-bullet list
@@ -209,7 +213,18 @@ list markers in a neutral gray. Vertical
 spacing comes from paragraph styles: overriding the fragment's frame would leave the caret above the
 glyphs. A marker sits on the item's first line of text, not its first line fragment: a first word
 too wide for the line wraps below the hidden marker, leaving the marker a line of almost no height,
-and the checkbox hit test reads the same line. There are no text attachments, overlay controls,
+and the checkbox hit test reads the same line.
+
+A table the selection is not in is a grid drawn over hidden source. Each row's text gets the hidden
+marker font, so it never wraps, and a fixed line height from `NoteTableGrid.rowHeight`; the delimiter
+row collapses to almost nothing. The styler measures every cell once per table with
+`NoteTableGrid.naturalWidth`, the same `NoteTableGrid.text` the fragment draws, and hands each row the
+shared widths. The fragment fits them to the container — columns under an even share keep their width
+and the rest split what is left — then truncates a cell that still does not fit. Each row draws its top
+edge, sides and column lines, so stacked rows share one line at every seam; the header is filled and
+rounds the top corners, and the last row closes and rounds the bottom. Bold, italic, strikethrough,
+inline code and links style a cell's text, but a cell's link is not clickable: a click reveals the
+table. There are no text attachments, overlay controls,
 `NSTextList`, `NSTextTable` or private API.
 
 ### Editing

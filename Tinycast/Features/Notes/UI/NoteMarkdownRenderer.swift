@@ -85,6 +85,10 @@ final class NoteMarkdownRenderer: NSObject, @MainActor NSTextStorageDelegate {
         let lower = max(0, newLines.lowerBound - 1)
         let upper = min(lines.count, max(newLines.upperBound, newLines.lowerBound + 1) + 1)
         var scope = IndexSet(integersIn: lower..<upper)
+        // Every row shares the columns, so a change to one row resizes the whole grid.
+        for table in markdown.tables where table.lines.overlaps(lower...(upper - 1)) {
+            scope.insert(integersIn: table.lines)
+        }
         let delta = newLines.count - oldLines.count
 
         let shiftedBlocks = old.fenceBlocks.map { block -> ClosedRange<Int> in

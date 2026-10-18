@@ -2,7 +2,7 @@ import Foundation
 
 /// Decides which lines show their raw Markdown rather than its rendered form.
 enum NoteRevealPolicy {
-    /// Lines that show raw syntax: those under the selection, widened to whole fenced blocks.
+    /// Lines that show raw syntax: those under the selection, plus block fences and whole tables.
     static func revealedLines(
         selection: NSRange, markdown: NoteMarkdown, isFocused: Bool
     ) -> IndexSet {
@@ -12,6 +12,10 @@ enum NoteRevealPolicy {
         for block in markdown.fenceBlocks where block.overlaps(first...last) {
             revealed.insert(block.lowerBound)
             revealed.insert(block.upperBound)
+        }
+        // A grid's columns size to every row, so it is edited as source all at once.
+        for table in markdown.tables where table.lines.overlaps(first...last) {
+            revealed.insert(integersIn: table.lines)
         }
         return revealed
     }

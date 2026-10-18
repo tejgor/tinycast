@@ -97,8 +97,19 @@ enum NoteMarkdownStyler {
             base[.noteBlockDecoration] = decoration(
                 .rule, fill: Theme.Colors.separator, ink: Theme.Colors.separator)
         case .table:
-            base[.font] = NoteMarkdownTypography.codeBlock
-            base[.paragraphStyle] = tableRow
+            guard !isRevealed, let table = markdown.table(containing: index) else {
+                base[.font] = NoteMarkdownTypography.codeBlock
+                base[.paragraphStyle] = tableRow
+                break
+            }
+            base = hidden
+            let row = tableRow(index, of: table, in: markdown)
+            base[.paragraphStyle] = gridRow(row, isFirst: index == table.lines.lowerBound)
+            base[.noteBlockDecoration] = NoteBlockDecoration(
+                shape: .table(row), fill: color(Theme.Colors.cardFill), ink: color(Theme.Colors.noteText),
+                stroke: color(Theme.Colors.border),
+                accent: NSColor(cgColor: NSColor.linkColor.cgColor) ?? .linkColor,
+                bodyPointSize: NoteMarkdownTypography.body.pointSize)
         case .fenceOpen, .fenceClose, .code:
             base[.font] = NoteMarkdownTypography.codeBlock
             base[.paragraphStyle] = codeParagraph
@@ -184,6 +195,54 @@ enum NoteMarkdownStyler {
 
     /// A wrapped table row hangs under its first line, so each row still reads as one.
     private static let tableRow: NSParagraphStyle = paragraph { $0.headIndent = Theme.Spacing.lg }
+
+    /// Hidden source never wraps, so a fixed height is the row; the delimiter row all but vanishes.
+    private static func gridRow(_ row: NoteBlockDecoration.Shape.TableRow, isFirst: Bool) -> NSParagraphStyle {
+        paragraph {
+            let height =
+                row.role == .delimiter
+                ? NoteMarkdownTypography.hidden.pointSize
+                : NoteTableGrid.rowHeight(bodyPointSize: NoteMarkdownTypography.body.pointSize)
+            $0.minimumLineHeight = height
+            $0.maximumLineHeight = height
+            if isFirst { $0.paragraphSpacingBefore = Theme.Spacing.sm }
+            if row.isLast { $0.paragraphSpacing = Theme.Spacing.sm }
+        }
+    }
+
+    private static func tableRow(
+        _ index: Int, of table: NoteMarkdown.Table, in markdown: NoteMarkdown
+    ) -> NoteBlockDecoration.Shape.TableRow {
+        let grid = tableGrid(table, in: markdown)
+        let offset = index - table.lines.lowerBound
+        let lastContent = table.lines.upperBound == table.delimiterLine ? table.lines.lowerBound : table.lines.upperBound
+        return NoteBlockDecoration.Shape.TableRow(
+            role: offset == 0 ? .header : index == table.delimiterLine ? .delimiter : .body,
+            isLast: index == lastContent, cells: grid.cells[offset], widths: grid.widths,
+            alignments: table.alignments)
+    }
+
+    /// Every row of a table asks for the same columns, so one measurement serves the whole pass.
+    private static func tableGrid(
+        _ table: NoteMarkdown.Table, in markdown: NoteMarkdown
+    ) -> (cells: [[NoteMarkdown.TableCell]], widths: [CGFloat]) {
+        let start = markdown.lines[table.lines.lowerBound].range.location
+        let source = Array(markdown.units[start..<NSMaxRange(markdown.lines[table.lines.upperBound].range)])
+        if let cached = gridCache, cached.source == source { return (cached.cells, cached.widths) }
+        let pointSize = NoteMarkdownTypography.body.pointSize
+        let cells = table.cells.map { $0.map(markdown.cell) }
+        var widths = [CGFloat](repeating: NoteTableGrid.cellPadding * 2, count: table.alignments.count)
+        for (offset, row) in cells.enumerated() {
+            for (column, cell) in row.enumerated() {
+                let width = NoteTableGrid.naturalWidth(cell, bodyPointSize: pointSize, isHeader: offset == 0)
+                widths[column] = max(widths[column], width)
+            }
+        }
+        gridCache = (source, cells, widths)
+        return (cells, widths)
+    }
+
+    private static var gridCache: (source: [UInt16], cells: [[NoteMarkdown.TableCell]], widths: [CGFloat])?
 
     private static let codeParagraph: NSParagraphStyle = paragraph {
         $0.firstLineHeadIndent = codeInset

@@ -466,13 +466,35 @@ struct NotesEditorTests {
         let delimiterAt = (rows as NSString).range(of: "| `c`").location
         editor.textView.setSelectedRange(NSRange(location: delimiterAt, length: 0))
         editor.textView.insertText("| --- | --- |\n", replacementRange: editor.textView.selectedRange())
-        editor.textView.setSelectedRange(NSRange(location: 0, length: 0))
         let code = (editor.textView.string as NSString).range(of: "`a`").location
         check(
-            "typing a delimiter row turns every row into a literal monospaced table",
+            "typing a delimiter row reveals every row of the new table as monospaced source",
             font(in: editor.textView, at: code) == NoteMarkdownTypography.codeBlock
                 && font(in: editor.textView, at: lastRow()) == NoteMarkdownTypography.codeBlock
                 && editor.textView.string.contains("| `c` | d |"))
+        editor.textView.setSelectedRange(NSRange(location: 0, length: 0))
+        let header = (editor.textView.string as NSString).range(of: "| `a`").location
+        guard case .table(let headerRow)? = decoration(in: editor.textView, at: header)?.shape,
+            case .table(let lastTableRow)? = decoration(in: editor.textView, at: lastRow())?.shape
+        else {
+            check("a table the caret left is drawn as a grid", false)
+            return
+        }
+        check(
+            "a table the caret left is drawn as a grid over its hidden source",
+            font(in: editor.textView, at: code)?.pointSize == 0.01 && headerRow.role == .header
+                && headerRow.cells.map(\.text) == ["a", "b"] && headerRow.cells[0].runs.first?.kind == .code
+                && headerRow.widths.count == 2 && lastTableRow.isLast && !headerRow.isLast
+                && lastTableRow.widths == headerRow.widths)
+        check(
+            "columns too wide for the note shrink the wide ones and keep the narrow one",
+            NoteTableGrid.fitted([50, 300, 300], into: 400) == [50, 175, 175]
+                && NoteTableGrid.fitted([10, 20], into: 100) == [10, 20])
+        editor.textView.setSelectedRange(NSRange(location: lastRow(), length: 0))
+        check(
+            "the caret in any row reveals the whole table",
+            font(in: editor.textView, at: code) == NoteMarkdownTypography.codeBlock
+                && decoration(in: editor.textView, at: header) == nil)
     }
 
     private static func testRenderingOffIsLiteral() {

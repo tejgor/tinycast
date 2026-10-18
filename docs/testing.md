@@ -637,8 +637,11 @@ caches, TCC grants and login item, so this cannot disturb an installed copy.
   mouse-up
 - Clicking another app renders the whole note; clicking back reveals the caret line again
 - Inside a code block both fences show and Markdown inside it stays literal
-- A table shows as its literal source in the code font, with no styling inside it; adding the `| --- |`
-  row under existing rows turns them all into the table at once
+- A table renders as a grid in Dark and Light: filled header, rounded corners, one hairline at every
+  seam, `:--` / `:-:` / `--:` alignment, and bold, links and code inside cells; narrowing the window
+  shrinks the widest columns and truncates their cells
+- Putting the caret in any row shows the whole table as its source in the code font, and it re-renders
+  when the caret leaves; adding the `| --- |` row under existing rows turns them all into the table
 - Bullets, numbers and checkboxes are a neutral gray, bullet, numbered and task items are evenly spaced,
   and revealing a bullet or numbered line leaves its text where it was
 - A checkbox click toggles without moving the caret, autosaves, and Command-Z restores it; the file on

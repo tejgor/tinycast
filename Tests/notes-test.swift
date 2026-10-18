@@ -845,6 +845,26 @@ struct NotesTests {
         check(
             "table rows stay literal, with no inline spans",
             tableMarkdown.lines.allSatisfy { tableMarkdown.inlines(of: $0).isEmpty })
+        let folders = tableMarkdown.tables.first
+        check(
+            "a table records its lines, alignments and one cell per column per row",
+            tableMarkdown.tables.count == 1 && folders?.lines == 0...3
+                && folders?.alignments == [.leading, .center] && folders?.cells.map(\.count) == [2, 0, 2, 2])
+        let appCell = folders.map { tableMarkdown.cell($0.cells[2][0]) }
+        let rootCell = folders.map { tableMarkdown.cell($0.cells[2][1]) }
+        check(
+            "a cell drops its Markdown markers and keeps their spans",
+            appCell?.text == "App/" && appCell?.runs == [.init(kind: .code, range: NSRange(0..<4))]
+                && rootCell?.text == "root" && rootCell?.runs == [.init(kind: .strong, range: NSRange(0..<4))])
+        let grid = NoteMarkdownParser.parse("| a | b | c |\n|:--|--:|:-:|\n| x \\| y | [site](https://a.com) |")
+        let gridTable = grid.tables.first
+        let escaped = gridTable.map { grid.cell($0.cells[2][0]) }
+        let linkCell = gridTable.map { grid.cell($0.cells[2][1]) }
+        check(
+            "alignment colons, escaped pipes, link labels and short rows padded with empty cells",
+            gridTable?.alignments == [.leading, .trailing, .center] && escaped?.text == "x | y"
+                && linkCell?.text == "site" && linkCell?.runs.first?.kind == .link(destination: "https://a.com")
+                && gridTable?.cells[2].count == 3 && gridTable?.cells[2][2].length == 0)
         check(
             "outer pipes are optional and alignment colons are allowed",
             kinds("a | b\n:-- | --:\nc | d") == [.table, .table, .table])
