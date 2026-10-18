@@ -1,5 +1,6 @@
 #!/bin/bash
 # Update this fork from upstream: show what's new, then merge, build, install and relaunch.
+# `--rebuild` builds and installs what is committed on the branch, without fetching upstream.
 # `--rollback` swaps the installed app back to the copy the last update replaced.
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
@@ -61,37 +62,49 @@ if [ "${1:-}" = "--rollback" ]; then
     exit 0
 fi
 
-echo "▸ Fetching upstream…"
-git fetch -q upstream --tags || fail "Couldn't fetch from upstream."
 OLD="$(git rev-parse "$BRANCH")" || fail "No '$BRANCH' branch."
-COUNT="$(git rev-list --count "$BRANCH..$UPSTREAM")"
-if [ "$COUNT" = 0 ]; then
-    notify "Already up to date."
-    exit 0
-fi
-VERSION="$(git describe --tags --abbrev=0 "$UPSTREAM" | sed 's/^v//')"
+REBUILD=false
+[ "${1:-}" = "--rebuild" ] && REBUILD=true
 
-SUMMARY="$(git log --no-merges --format='• %s' "$BRANCH..$UPSTREAM" | head -15)"
-SHOWN="$(printf '%s\n' "$SUMMARY" | wc -l | tr -d ' ')"
-[ "$COUNT" -gt "$SHOWN" ] && SUMMARY="$SUMMARY"$'\n'"…and $((COUNT - SHOWN)) more"
-COMPARE="https://github.com/$UPSTREAM_SLUG/compare/$(git merge-base "$BRANCH" "$UPSTREAM")...$(git rev-parse "$UPSTREAM")"
-while :; do
-    CHOICE="$(osascript - "$COUNT new upstream commits (v$VERSION):"$'\n\n'"$SUMMARY" 2>/dev/null <<'EOF'
+confirm_upstream() {
+    echo "▸ Fetching upstream…"
+    git fetch -q upstream --tags || fail "Couldn't fetch from upstream."
+    COUNT="$(git rev-list --count "$BRANCH..$UPSTREAM")"
+    if [ "$COUNT" = 0 ]; then
+        notify "Already up to date."
+        exit 0
+    fi
+    VERSION="$(git describe --tags --abbrev=0 "$UPSTREAM" | sed 's/^v//')"
+
+    local summary shown compare choice
+    summary="$(git log --no-merges --format='• %s' "$BRANCH..$UPSTREAM" | head -15)"
+    shown="$(printf '%s\n' "$summary" | wc -l | tr -d ' ')"
+    [ "$COUNT" -gt "$shown" ] && summary="$summary"$'\n'"…and $((COUNT - shown)) more"
+    compare="https://github.com/$UPSTREAM_SLUG/compare/$(git merge-base "$BRANCH" "$UPSTREAM")...$(git rev-parse "$UPSTREAM")"
+    while :; do
+        choice="$(osascript - "$COUNT new upstream commits (v$VERSION):"$'\n\n'"$summary" 2>/dev/null <<'EOF'
 on run argv
     set r to display dialog (item 1 of argv) with title "Update Tinycast" ¬
         buttons {"Cancel", "View on GitHub", "Update"} default button "Update" cancel button "Cancel"
     return button returned of r
 end run
 EOF
-    )"
-    case "$CHOICE" in
-        Update) break ;;
-        "View on GitHub") open "$COMPARE" ;;
-        *) echo "Cancelled."; exit 0 ;;
-    esac
-done
+        )"
+        case "$choice" in
+            Update) return ;;
+            "View on GitHub") open "$compare" ;;
+            *) echo "Cancelled."; exit 0 ;;
+        esac
+    done
+}
 
-echo "▸ Merging $UPSTREAM into a copy of ${BRANCH}…"
+if $REBUILD; then
+    VERSION="$(git describe --tags --abbrev=0 "$BRANCH" | sed 's/^v//')"
+else
+    confirm_upstream
+fi
+
+echo "▸ Preparing a copy of ${BRANCH}…"
 if [ -d "$WORKTREE" ]; then
     git -C "$WORKTREE" merge --abort >/dev/null 2>&1
     git -C "$WORKTREE" reset -q --hard && git -C "$WORKTREE" checkout -q --detach "$OLD" \
@@ -100,7 +113,7 @@ else
     git worktree add -q --detach "$WORKTREE" "$OLD" || fail "Couldn't create $WORKTREE."
 fi
 cd "$WORKTREE" || exit 1
-if ! git merge -q --no-edit -m "Merge upstream v$VERSION" "$UPSTREAM"; then
+if ! $REBUILD && ! git merge -q --no-edit -m "Merge upstream v$VERSION" "$UPSTREAM"; then
     CONFLICTS="$(git diff --name-only --diff-filter=U)"
     # The project file is generated from project.yml, so regenerating it is the resolution.
     if [ "$CONFLICTS" = "Tinycast.xcodeproj/project.pbxproj" ]; then
@@ -129,8 +142,10 @@ APP="$DERIVED/Build/Products/Release/Tinycast.app"
 codesign --verify --deep --strict "$APP" || fail "The new build's signature doesn't verify."
 cd "$REPO" || exit 1
 
-echo "▸ Moving $BRANCH to the merge…"
-if [ "$(git branch --show-current)" = "$BRANCH" ]; then
+if $REBUILD && [ "$MERGED" = "$OLD" ]; then
+    :
+elif [ "$(git branch --show-current)" = "$BRANCH" ]; then
+    echo "▸ Moving $BRANCH to the merge…"
     git merge -q --ff-only "$MERGED" \
         || echo "! Your checkout has changes in the way; run 'git merge --ff-only $MERGED' later."
 else
@@ -148,4 +163,8 @@ if ! ditto "$APP" "$INSTALLED"; then
     fail "Couldn't copy the new build; the previous one is back in place."
 fi
 open "$INSTALLED"
-notify "✓ Updated to v$VERSION ($COUNT upstream commits)."
+if $REBUILD; then
+    notify "✓ Rebuilt and installed $BRANCH ($(git rev-parse --short "$BRANCH"))."
+else
+    notify "✓ Updated to v$VERSION ($COUNT upstream commits)."
+fi
