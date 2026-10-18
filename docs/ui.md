@@ -173,7 +173,7 @@ panel, the shortcut-recorder callout and the Notes switcher, and `menuRow` is de
 
 The opt-in Dictation capsule adds `dictationPanel 144×44`, with 2pt waveform bars separated by 3pt.
 
-Notes adds `noteWindow 440×180` (opening size on a first run, and the floor), `noteWindowMaxHeight 860`,
+Notes adds `noteWindow 470×180` (opening size on a first run, and the floor), `noteWindowMaxHeight 860`,
 `noteTitlebar 44`, `noteTitleInset 120`, `noteEditorInset 16`, `noteSearchHeight 34`,
 `noteFooterHeight 28`, `noteGlyph 16`, `noteEmptyGlyph 28`, and `noteHeadingMenu 220×159`.
 

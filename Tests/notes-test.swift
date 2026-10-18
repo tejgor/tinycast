@@ -1060,6 +1060,22 @@ struct NotesTests {
         check("⇧⌘B skips blank lines in a selection", edit(.toggleQuote, "«a\n\nb»") == "> «a\n\n> b»")
         check("⇧⌘B quotes an empty line", edit(.toggleQuote, "|") == "> |")
         check("⇧⌘B unquotes one level", edit(.toggleQuote, "> > a|") == "> a|")
+
+        let emptyTable = "|  |  |  |\n| --- | --- | --- |\n|  |  |  |"
+        let caret = { (location: Int) in NSRange(location: location, length: 0) }
+        let onBlank = apply(.insertTable, "", selection: caret(0))
+        check(
+            "the table button fills an empty line and puts the caret in the first header cell",
+            onBlank?.0 == emptyTable && onBlank?.1 == caret(2)
+                && NoteMarkdownParser.parse(emptyTable).tables.first?.alignments.count == 3)
+        let below = apply(.insertTable, "intro\nnext", selection: caret(2))
+        check(
+            "on a line with text the table goes below it, a blank line from the text on each side",
+            below?.0 == "intro\n\n" + emptyTable + "\n\nnext" && below?.1 == caret(9))
+        check(
+            "the table button does nothing inside a code block or a table",
+            apply(.insertTable, "```\ncode\n```", selection: caret(5)) == nil
+                && apply(.insertTable, emptyTable, selection: caret(2)) == nil)
         check("⇧⌘B unquotes a line", edit(.toggleQuote, "> a|") == "a|")
         check("⇧⌘B completes a mixed selection", edit(.toggleQuote, "«> a\nb»") == "«> a\n> b»")
         check("⇧⌘B keeps indentation", edit(.toggleQuote, "  a|") == "  > a|")

@@ -47,7 +47,10 @@ struct NoteFormattingBar: View {
         Control(
             symbol: "text.quote", title: String(localized: "Quote"), shortcut: "⇧⌘B",
             action: .toggleQuote
-        ) { $0.isQuote }
+        ) { $0.isQuote },
+        Control(symbol: "tablecells", title: String(localized: "Table"), shortcut: "", action: .insertTable) { _ in
+            false
+        }
     ]
 
     private static let lists = [
@@ -109,7 +112,7 @@ struct NoteFormattingBar: View {
                 .focusable(false)
                 .accessibilityLabel(control.title)
                 .accessibilityAddTraits(lit ? .isSelected : [])
-                .tooltip("\(control.title)  \(control.shortcut)")
+                .tooltip(control.shortcut.isEmpty ? control.title : "\(control.title)  \(control.shortcut)")
             }
         }
     }

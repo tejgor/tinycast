@@ -20,6 +20,7 @@ enum NoteMarkdownEditing {
         case .toggleList(let style): return document.toggleList(style, in: selection)
         case .toggleCodeBlock: return document.toggleCodeBlock(in: selection)
         case .toggleQuote: return document.toggleQuote(in: selection)
+        case .insertTable: return document.insertTable(at: selection)
         case .toggleTask(let lineIndex): return document.toggleTask(lineIndex, keeping: selection)
         case .typedSpace: return document.typedSpace(at: selection)
         case .pasteURL(let string): return document.pasteURL(string, over: selection)
@@ -399,6 +400,23 @@ enum NoteMarkdownEditing {
             return NoteEditPlan(
                 range: body, replacement: fence + "\n" + text.substring(with: body) + "\n" + fence,
                 selection: after)
+        }
+
+        /// Blank lines keep it apart from its neighbours, so a following pipe line never joins it.
+        func insertTable(at selection: NSRange) -> NoteEditPlan? {
+            guard let index = markdown.lineIndexes(intersecting: selection).last else { return nil }
+            let line = markdown.lines[index]
+            guard !line.kind.isFenced, line.kind != .table else { return nil }
+            let header = "|  |  |  |"
+            let table = header + "\n| --- | --- | --- |\n|  |  |  |"
+            let followed = markdown.lines.indices.contains(index + 1) && markdown.lines[index + 1].kind != .blank
+            let trailer = followed ? "\n" : ""
+            let isBlank = line.kind == .blank
+            let at = isBlank ? line.range.location : NSMaxRange(line.contentRange)
+            let leader = isBlank ? "" : "\n\n"
+            return NoteEditPlan(
+                range: NSRange(location: at, length: 0), replacement: leader + table + trailer,
+                selection: NSRange(location: at + leader.utf16.count + 2, length: 0))
         }
 
         /// A closing fence on the last line has no newline, so it takes the one before it.

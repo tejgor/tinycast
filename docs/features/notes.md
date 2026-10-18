@@ -280,9 +280,13 @@ While Render Markdown and Show Formatting Bar are both on, the band under the ed
 character count at its leading edge and the formatting bar at its trailing edge. The bar is
 `NoteFormattingBar`, a frosted capsule in the title bar's recipe. It starts collapsed to one round
 `paintbrush` button; ⌥⌘T or a click expands it, and the buttons slide out from behind that button:
-a heading menu, Bold, Italic, Strikethrough, Inline Code and Link, then Code Block and Quote, then
-Numbered, Bullet and Task List. Hovering a button shows its name and shortcut. Each button is a
-28-point square, so the whole row fits the smallest window. The count hides when the row leaves it no
+a heading menu, Bold, Italic, Strikethrough, Inline Code and Link, then Code Block, Quote and Table,
+then Numbered, Bullet and Task List. Hovering a button shows its name and shortcut, when it has one.
+Each button is a 28-point square, and the 470-point minimum window is what lets the whole row fit.
+Table has no chord and is never lit: it inserts an empty three-column table — on the caret's line
+when that is blank, otherwise below it after a blank line, with a blank line before any following
+text so a pipe line there cannot join it — and puts the caret in the first header cell. It does
+nothing inside a code block or a table. The count hides when the row leaves it no
 lane, and the band never widens the note.
 
 Expanded or collapsed is window state, not a preference: `AppCore` reads and writes it under

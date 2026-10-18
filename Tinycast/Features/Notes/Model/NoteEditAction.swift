@@ -15,6 +15,8 @@ enum NoteEditAction: Sendable, Equatable {
     case toggleList(ListStyle)
     case toggleCodeBlock
     case toggleQuote
+    /// An empty three-column table, on the caret's line when blank and below it otherwise.
+    case insertTable
     case toggleTask(lineIndex: Int)
     /// The `[] ` input rule.
     case typedSpace

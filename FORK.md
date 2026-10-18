@@ -41,6 +41,8 @@ locally on one Mac. Everything in `AGENTS.md` still applies; this file only adds
 - Personal bundle id and `Scripts/update-fork.sh`.
 - ⌘↑ / ⌘↓ jump between sections in ⌘K action menus (`RootPaletteView.moveMenuSection`).
 - Markdown tables in Notes render as a grid (`NoteMarkdown.Table`, `NoteTableGrid`, notes docs).
+- A Table button in the Notes formatting bar inserts an empty three-column table
+  (`NoteEditAction.insertTable`); the minimum note window grew from 440 to 470 points to fit it.
 - Settings → General → Transparency thins the launcher's scrim over its glass
   (`AppSettings.paletteTransparency`, `appearance.transparency` in `settings.json`; not in backups).
 
