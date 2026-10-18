@@ -425,6 +425,8 @@ caches, TCC grants and login item, so this cannot disturb an installed copy.
   candidate is committed — check on a second summon too, where first responder never moved
 - Typing filters instantly; ↑/↓ move the highlight and scroll it into view without yanking the list
 - ⌃N/⌃P move the highlight as ↓/↑ do; ⌃F/⌃B step the emoji grid's selection, and the caret elsewhere
+- In a ⌘K menu with separators, ⌘↓ jumps to the next group's first row and ⌘↑ back to the current
+  group's first, then the previous group's — in an extension's panel too
 - The highlight always sits on the row the footer pill describes
 - With a calculation typed, the calculator card is first and is selected first
 - ⌘↵ on a number, unit or money card puts the answer in the search bar with the caret after it, so

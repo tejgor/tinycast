@@ -505,7 +505,7 @@ struct RootPaletteView: View {
                     return .handled
                 }
                 if menuOpen {
-                    moveMenu(1)
+                    if isSectionChord(press.modifiers) { moveMenuSection(1) } else { moveMenu(1) }
                     return .handled
                 }
                 return moveVertically(1)
@@ -515,7 +515,7 @@ struct RootPaletteView: View {
                 if vm.isControlListOpen { return .ignored }
                 if isCollapsed { return .ignored }
                 if menuOpen {
-                    moveMenu(-1)
+                    if isSectionChord(press.modifiers) { moveMenuSection(-1) } else { moveMenu(-1) }
                     return .handled
                 }
                 return moveVertically(-1)
@@ -1163,6 +1163,12 @@ struct RootPaletteView: View {
         case .some(.upArrow) where navigationModifiers.isEmpty:
             moveMenu(-1)
             return true
+        case .some(.downArrow) where navigationModifiers == .command:
+            moveMenuSection(1)
+            return true
+        case .some(.upArrow) where navigationModifiers == .command:
+            moveMenuSection(-1)
+            return true
         case .some(.carriageReturn), .some(.enter):
             let screen = screen
             let selection = selection(in: screen)
@@ -1328,6 +1334,29 @@ struct RootPaletteView: View {
         while (0..<content.rowCount).contains(row) {
             if content.isSelectable(row) {
                 menuSelection = row
+                return
+            }
+            row += delta
+        }
+    }
+
+    private func isSectionChord(_ modifiers: SwiftUI.EventModifiers) -> Bool {
+        modifiers.intersection([.command, .control, .option, .shift]) == .command
+    }
+
+    /// ⌘↓ lands on the next group's first row; ⌘↑ on this group's first, then the one before.
+    private func moveMenuSection(_ delta: Int) {
+        guard let content = menuContent, content.rowCount > 0 else { return }
+        let opensSection = { (row: Int) in row == 0 || content.startsSection(row) }
+        var start = min(menuSelection, content.rowCount - 1)
+        while start > 0, !opensSection(start) { start -= 1 }
+        var row = delta < 0 && menuSelection > start ? start : start + delta
+        while (0..<content.rowCount).contains(row) {
+            if opensSection(row),
+                let first = (row..<content.rowCount).first(where: content.isSelectable),
+                first != menuSelection
+            {
+                menuSelection = first
                 return
             }
             row += delta

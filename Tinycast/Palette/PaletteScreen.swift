@@ -39,6 +39,8 @@ typealias MenuPanelClipPath =
     let rowCount: Int
     let preferredSelection: Int?
     let isSelectable: (Int) -> Bool
+    /// Whether a row opens a group, which is where ⌘↑ and ⌘↓ land.
+    let startsSection: (Int) -> Bool
     let clipPath: MenuPanelClipPath
     let motion: MenuPanelMotion
     /// Built on demand: `moveMenu` resolves the open menu on every arrow key.
@@ -51,6 +53,7 @@ typealias MenuPanelClipPath =
         view: @escaping (MenuPanelCorner) -> AnyView,
         activate: @escaping (Int) -> Void,
         isSelectable: @escaping (Int) -> Bool = { _ in true },
+        startsSection: @escaping (Int) -> Bool = { _ in false },
         clipPath: @escaping MenuPanelClipPath,
         motion: MenuPanelMotion
     ) {
@@ -59,6 +62,7 @@ typealias MenuPanelClipPath =
         self.view = view
         self.activate = activate
         self.isSelectable = isSelectable
+        self.startsSection = startsSection
         self.clipPath = clipPath
         self.motion = motion
     }
@@ -81,6 +85,7 @@ typealias MenuPanelClipPath =
             },
             activate: { popover.items[$0].action() },
             isSelectable: { popover.items[$0].isSelectable },
+            startsSection: { popover.items[$0].startsSection || popover.items[$0].sectionTitle != nil },
             clipPath: { bounds, metrics, corner in
                 PopoverMenu.SurfaceShape(
                     attachment: corner.popoverAttachment, radius: metrics.radius.menuPanel,

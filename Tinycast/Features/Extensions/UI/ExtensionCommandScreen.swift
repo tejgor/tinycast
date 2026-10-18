@@ -136,6 +136,7 @@ struct ExtensionCommandScreen: PaletteScreen {
                 guard let handler = filteredActions[index].handler else { return }
                 extensions.dispatch(handler: handler)
             },
+            startsSection: { filteredSectionStarts[$0] },
             clipPath: { bounds, metrics, _ in
                 UnevenRoundedRectangle(
                     topLeadingRadius: metrics.radius.menuPanel,

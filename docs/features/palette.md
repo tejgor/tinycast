@@ -457,7 +457,10 @@ list under itself (Move Favorite Up/Down) is no exception, so no row ever runs a
 
 `PopoverMenuItem.startsSection` draws a separator with the list inset (8pt) above and below it, so a
 row sits as far from it as from the search field's hairline. That height joins the menu's exact
-sizing, but the separator takes no selection index, so navigation still walks only rows. A menu
+sizing, but the separator takes no selection index, so navigation still walks only rows. ⌘↓ jumps
+to the next group's first selectable row; ⌘↑ to the current group's first, or the previous group's
+when already there. A `sectionTitle` opens a group as `startsSection` does, and
+`PaletteMenuContent.startsSection` is how an extension's panel reports its own. A menu
 taller than its default cap ends its viewport mid-row, so the fold never lands on a separator or section
 title, and both hairlines are one device pixel.
 The app menu keeps its five actions in one group and caps the list at four and a half rows, leaving
