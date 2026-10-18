@@ -91,7 +91,7 @@ EOF
     esac
 done
 
-echo "▸ Merging $UPSTREAM into a copy of $BRANCH…"
+echo "▸ Merging $UPSTREAM into a copy of ${BRANCH}…"
 if [ -d "$WORKTREE" ]; then
     git -C "$WORKTREE" merge --abort >/dev/null 2>&1
     git -C "$WORKTREE" reset -q --hard && git -C "$WORKTREE" checkout -q --detach "$OLD" \
