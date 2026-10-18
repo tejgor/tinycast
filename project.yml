@@ -23,6 +23,8 @@ settings:
       TINYCAST_BUNDLE_IDENTIFIER: com.tinycast.app.dev
       DICTATION_EXECUTABLE_NAME: Tinycast Dev Dictation
     Release:
+      # Personal fork channel: off the stable/beta ids, so the built-in updater stays out of the way.
+      TINYCAST_BUNDLE_IDENTIFIER: com.tinycast.app.personal
       DICTATION_EXECUTABLE_NAME: Tinycast Dictation
       # Release-only: library validation refuses Debug's `.debug.dylib`, whose team never matches.
       ENABLE_HARDENED_RUNTIME: YES

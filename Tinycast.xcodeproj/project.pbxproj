@@ -5084,7 +5084,7 @@
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_STRICT_CONCURRENCY = complete;
 				SWIFT_VERSION = 6.0;
-				TINYCAST_BUNDLE_IDENTIFIER = com.tinycast.app;
+				TINYCAST_BUNDLE_IDENTIFIER = com.tinycast.app.personal;
 			};
 			name = Release;
 		};
