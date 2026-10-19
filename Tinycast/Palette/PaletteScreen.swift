@@ -1,33 +1,8 @@
-import QuartzCore
 import SwiftUI
 
 enum PaletteAxis {
     case vertical
     case horizontal
-}
-
-/// Scale and timing supplied by content while the palette owns the window mechanics.
-@MainActor struct MenuPanelMotion {
-    let entryScale: CGFloat
-    let maximumScale: CGFloat
-    let exitScaleDelta: CGFloat
-    let expansionDuration: TimeInterval
-    let settleDuration: TimeInterval
-    let exitDuration: TimeInterval
-    let expansionTiming: CAMediaTimingFunction
-    let settleTiming: CAMediaTimingFunction
-    let exitTiming: CAMediaTimingFunction
-
-    static let palette = MenuPanelMotion(
-        entryScale: Theme.MenuMotion.entryScale,
-        maximumScale: Theme.MenuMotion.maximumScale,
-        exitScaleDelta: Theme.MenuMotion.exitScaleDelta,
-        expansionDuration: Theme.MenuMotion.expansionDuration,
-        settleDuration: Theme.MenuMotion.settleDuration,
-        exitDuration: Theme.MenuMotion.exitDuration,
-        expansionTiming: Theme.MenuMotion.expansionTiming,
-        settleTiming: Theme.MenuMotion.settleTiming,
-        exitTiming: Theme.MenuMotion.exitTiming)
 }
 
 typealias MenuPanelClipPath =
@@ -42,7 +17,6 @@ typealias MenuPanelClipPath =
     /// Whether a row opens a group, which is where ⌘↑ and ⌘↓ land.
     let startsSection: (Int) -> Bool
     let clipPath: MenuPanelClipPath
-    let motion: MenuPanelMotion
     /// Built on demand: `moveMenu` resolves the open menu on every arrow key.
     let view: (MenuPanelCorner) -> AnyView
     /// Bounds-checked by the caller against `rowCount`, so a row index is always one this menu has.
@@ -54,8 +28,7 @@ typealias MenuPanelClipPath =
         activate: @escaping (Int) -> Void,
         isSelectable: @escaping (Int) -> Bool = { _ in true },
         startsSection: @escaping (Int) -> Bool = { _ in false },
-        clipPath: @escaping MenuPanelClipPath,
-        motion: MenuPanelMotion
+        clipPath: @escaping MenuPanelClipPath
     ) {
         self.rowCount = rowCount
         self.preferredSelection = preferredSelection
@@ -64,7 +37,6 @@ typealias MenuPanelClipPath =
         self.isSelectable = isSelectable
         self.startsSection = startsSection
         self.clipPath = clipPath
-        self.motion = motion
     }
 
     init(
@@ -91,8 +63,7 @@ typealias MenuPanelClipPath =
                     attachment: corner.popoverAttachment, radius: metrics.radius.menuPanel,
                     attachedRadius: metrics.size.menuButton / 2
                 ).path(in: bounds).cgPath
-            },
-            motion: .palette)
+            })
     }
 }
 
