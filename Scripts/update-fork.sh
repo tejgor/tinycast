@@ -111,7 +111,9 @@ fi
 # Writes stay inside the worktree (the session's directory) and git can't move a branch or push, so
 # nothing it does reaches `personal` or the installed app until the checks below pass.
 ask_claude() {
-    local label=$1 task=$2 transcript="$REPO/build/update-claude-$label.json"
+    local label=$1
+    local task=$2
+    local transcript="$REPO/build/update-claude-${label// /-}.json"
     [ "$USE_CLAUDE" = 1 ] || return 1
     command -v claude >/dev/null || { echo "! claude not found on PATH"; return 1; }
     notify "Claude Code is fixing the $label (this can take a few minutes)…"
