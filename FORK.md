@@ -79,7 +79,7 @@ locally on one Mac. Everything in `AGENTS.md` still applies; this file only adds
     ⌘K action panel (`NoteActionsWindowController`) with copy/export as Markdown, HTML or plain text
     (`NoteExport`), deeplinks (`NoteDeepLink`, `tinycast://notes/open?id=…`), duplicate and delete all.
   - Device-local Notes state lives in `NotesLocalState` (one `AppCore` line), not in `AppSettings`.
-- Settings → General → Transparency thins the launcher's scrim over its glass
+- Settings → General → Transparency thins the scrim over the launcher's and the note window's glass
   (`AppSettings.paletteTransparency`, `appearance.transparency` in `settings.json`; not in backups).
 
 ## Adding a feature without making merges painful

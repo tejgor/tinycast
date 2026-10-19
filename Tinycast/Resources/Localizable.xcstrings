@@ -60787,54 +60787,54 @@
         }
       }
     },
-    "How much of what is behind the launcher shows through its glass." : {
+    "How much of what is behind the launcher and notes shows through their glass." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Wie viel hinter dem Launcher durch sein Glas zu sehen ist."
+            "value" : "Wie viel hinter dem Launcher und den Notizen durch ihr Glas zu sehen ist."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Cuánto de lo que hay detrás del lanzador se ve a través de su cristal."
+            "value" : "Cuánto de lo que hay detrás del lanzador y las notas se ve a través de su cristal."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La part de ce qui se trouve derrière le lanceur visible à travers son verre."
+            "value" : "La part de ce qui se trouve derrière le lanceur et les notes visible à travers leur verre."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ランチャーのガラス越しに背後がどれだけ透けて見えるかを設定します。"
+            "value" : "ランチャーとメモのガラス越しに背後がどれだけ透けて見えるかを設定します。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "런처의 유리 너머로 뒤쪽이 얼마나 비쳐 보이는지 설정합니다."
+            "value" : "런처와 메모의 유리 너머로 뒤쪽이 얼마나 비쳐 보이는지 설정합니다."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Quanto do que está atrás do iniciador aparece através do vidro."
+            "value" : "Quanto do que está atrás do iniciador e das notas aparece através do vidro."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Насколько сквозь стекло лаунчера видно то, что за ним."
+            "value" : "Насколько сквозь стекло лаунчера и заметок видно то, что за ними."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "启动器的玻璃能透出多少其后方的内容。"
+            "value" : "启动器和笔记的玻璃能透出多少其后方的内容。"
           }
         }
       }

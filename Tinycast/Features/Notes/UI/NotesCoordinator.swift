@@ -150,6 +150,8 @@ final class NotesCoordinator {
 
     var activeTitle: String { store.activeTitle }
     var rendersMarkdown: Bool { settings.notesRendersMarkdown }
+    /// Settings > General > Transparency thins the note window's scrim as it does the launcher's.
+    var scrimOpacity: Double { 1 - Double(settings.paletteTransparency) / 100 }
     var showsFormattingBar: Bool { settings.notesRendersMarkdown && settings.notesShowsFormattingBar }
     var isSearching: Bool { store.isSearching }
     var visibleNotes: [NoteSummary] {

@@ -243,7 +243,7 @@ private struct TransparencyRow: View {
     var body: some View {
         SettingsRow(
             title: "Transparency",
-            subtitle: String(localized: "How much of what is behind the launcher shows through its glass."),
+            subtitle: String(localized: "How much of what is behind the launcher and notes shows through their glass."),
             anchor: .generalAppearance
         ) {
             HStack(spacing: Theme.Spacing.md) {
