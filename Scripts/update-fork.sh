@@ -177,6 +177,13 @@ lines = reply.strip().splitlines()
 if result and not result.get("is_error") and lines and lines[-1].startswith("RESULT: resolved"):
     print("resolved")
     sys.exit()
+# A session that answered was signed in, whatever a stray warning on stderr says.
+if result and not result.get("is_error"):
+    if lines and lines[-1].startswith("RESULT: failed"):
+        print("failed: " + lines[-1][len("RESULT: failed"):].lstrip(" :-—")[:200])
+    else:
+        print("failed: it ended without saying it resolved anything")
+    sys.exit()
 # A login the session can't use: an expired one, or a future `-p` default that skips it.
 sign_in = re.search(
     r"authentication_failed|not logged in|please run /login|login expired|invalid api key"
@@ -185,8 +192,6 @@ sign_in = re.search(
 if sign_in:
     line = next((l for l in errors.splitlines() if sign_in.group(0).lower() in l.lower()), sign_in.group(0))
     print("sign-in: " + line.strip()[:200])
-elif lines and lines[-1].startswith("RESULT: failed"):
-    print("failed: " + lines[-1][len("RESULT: failed"):].lstrip(" :-—")[:200])
 elif result:
     print("failed: it ended without saying it resolved anything (" + str(result.get("subtype", "no subtype")) + ")")
 else:
