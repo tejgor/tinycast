@@ -41,6 +41,7 @@ final class NotesCoordinator {
     private var presentationGeneration = 0
 
     @ObservationIgnored private let saveFormattingBarExpanded: @Sendable (Bool) -> Void
+    let local: NotesLocalState
 
     init(
         store: NotesStore,
@@ -48,7 +49,8 @@ final class NotesCoordinator {
         appIndex: AppIndex,
         core: AppCore,
         isFormattingBarExpanded: Bool = false,
-        saveFormattingBarExpanded: @escaping @Sendable (Bool) -> Void = { _ in }
+        saveFormattingBarExpanded: @escaping @Sendable (Bool) -> Void = { _ in },
+        local: NotesLocalState
     ) {
         self.store = store
         self.settings = settings
@@ -56,6 +58,7 @@ final class NotesCoordinator {
         self.core = core
         self.isFormattingBarExpanded = isFormattingBarExpanded
         self.saveFormattingBarExpanded = saveFormattingBarExpanded
+        self.local = local
         store.onIssue = { [weak self] issue in self?.present(issue) }
     }
 
@@ -323,6 +326,18 @@ final class NotesCoordinator {
 
     func moveToTopRight() {
         windowController.moveToTopRight()
+    }
+
+    var autoSizesWindow: Bool { local.autoSizesWindow }
+
+    /// A size set by hand is the one wanted, so it ends auto-sizing until that is turned back on.
+    func windowResizedByUser() {
+        local.autoSizesWindow = false
+    }
+
+    func toggleWindowAutoSizing() {
+        local.autoSizesWindow.toggle()
+        if local.autoSizesWindow { windowController.refit() }
     }
 
     func updateSource(_ source: String) {

@@ -109,6 +109,15 @@ final class NotesWindowController: NSObject, NSWindowDelegate {
         seatTrafficLights(in: panel)
     }
 
+    /// Only a drag is a live resize; fitting and moving set the frame directly.
+    func windowDidEndLiveResize(_ notification: Notification) {
+        coordinator.windowResizedByUser()
+    }
+
+    func refit() {
+        scheduleFit()
+    }
+
     func windowDidUpdate(_ notification: Notification) {
         guard let panel else { return }
         seatTrafficLights(in: panel)
@@ -153,7 +162,7 @@ final class NotesWindowController: NSObject, NSWindowDelegate {
     }
 
     private func fitToEditor() {
-        guard let panel, panel.isVisible, !panel.inLiveResize,
+        guard let panel, panel.isVisible, !panel.inLiveResize, coordinator.autoSizesWindow,
             let editor, let clipView = editor.enclosingScrollView?.contentView,
             let visibleFrame = (panel.screen ?? NSScreen.main)?.visibleFrame
         else { return }

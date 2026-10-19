@@ -33,10 +33,12 @@ commands and global shortcuts can show, search, or extend the collection.
   commands are absent, and enabling alone does not enumerate or create the Notes directory.
 - **The collection may be empty.** Deleting the last note is allowed and creates no replacement; the
   window shows its empty state and Create Note still works from there.
-- **The window's height always fits the note.** Every edit, note switch and bar toggle grows or
-  shrinks it between the 180pt floor and 860pt, or the screen's visible height; past that the editor
-  scrolls. The top edge holds until the bottom would leave the visible frame, then the window moves
-  up. A manually dragged height lasts until the next edit. The height is the sum of TextKit's layout
+- **While auto-sizing is on, the window's height fits the note.** Every edit, note switch and bar
+  toggle grows or shrinks it between the 180pt floor and 860pt, or the screen's visible height; past
+  that the editor scrolls. The top edge holds until the bottom would leave the visible frame, then the
+  window moves up. Resizing the window by hand turns auto-sizing off (`NotesLocalState.autoSizesWindow`,
+  device-local), so that size is kept; the action panel's Enable Window Auto-Sizing turns it back on
+  and refits. Only a drag is a live resize, so fitting and moving never count. The height is the sum of TextKit's layout
   fragment heights, laid out from the top a paragraph at a time until it passes the tallest window: the
   text view's frame never gets shorter than its clip view, and until the next draw the lines below an
   edit keep their old origins, so neither the frame nor the last fragment's position can be read on
@@ -232,7 +234,8 @@ table. There are no text attachments, overlay controls,
 `Model/NoteMarkdownEditing` turns a gesture into a `NoteEditPlan`, one replacement plus the selection
 after it. Nil means AppKit handles the key natively. `NoteTextView.performEdit` applies a plan through
 `shouldChangeText`, `replaceCharacters` and `didChangeText`, so each gesture is one undo step and
-reaches autosave.
+reaches autosave, then scrolls the new selection into view: native typing scrolls on its own, a
+replacement does not, and Return at the end of a long list would otherwise leave the caret off-screen.
 
 - Return continues a list or quote and leaves it on an empty item. Tab and Shift-Tab nest list items
   by four spaces. Backspace at an item's content start outdents it, then removes its marker. These

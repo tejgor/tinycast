@@ -28,6 +28,8 @@ final class NoteTextView: NSTextView, InjectableTextView {
         textStorage.replaceCharacters(in: plan.range, with: plan.replacement)
         didChangeText()
         setSelectedRange(plan.selection)
+        // Typing scrolls to the caret itself; a planned edit, like Return in a list, must ask.
+        scrollRangeToVisible(plan.selection)
         breakUndoCoalescing()
         return true
     }

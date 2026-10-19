@@ -26,6 +26,7 @@ struct NotesEditorTests {
         testBlockDecorationsAndFragments()
         testListMarkersWaitForSpace()
         testListKeysAndChords()
+        testReturnScrollsToCaret()
         testFormattingReports()
         testTaskRuleCheckboxesAndLinks()
         testTasks()
@@ -693,6 +694,21 @@ struct NotesEditorTests {
         check(
             "space turns a number marker into a list",
             editor.coordinator.renderer.markdown.lines[0].kind == .ordered(number: 1))
+    }
+
+    private static func testReturnScrollsToCaret() {
+        let source = (1...60).map { "- item \($0)" }.joined(separator: "\n")
+        let input = NoteEditorInput(id: NoteID(rawValue: "Scroll.md"), source: source, epoch: 1)
+        let editor = makeEditor(input: input, rendersMarkdown: true)
+        if let layout = editor.textView.textLayoutManager { layout.ensureLayout(for: layout.documentRange) }
+        editor.textView.sizeToFit()
+        editor.textView.setSelectedRange(NSRange(location: (source as NSString).length, length: 0))
+        editor.textView.scroll(.zero)
+        editor.textView.insertNewline(nil)
+        let visible = editor.textView.visibleRect
+        check(
+            "Return continuing a list at the bottom scrolls the new line into view",
+            visible.minY > 0 && visible.maxY >= editor.textView.bounds.height - Theme.Size.noteEditorTopInset * 2)
     }
 
     private static func testListKeysAndChords() {

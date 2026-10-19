@@ -23,9 +23,20 @@ struct NotesTests {
         try await testCollectionMutationsFlushTheDraft()
         try await testStoreRecoversFromFailures()
         try await testStoreRelocates()
+        testLocalState()
 
         print(failures == 0 ? "Notes tests passed" : "\(failures) tests failed")
         exit(failures == 0 ? 0 : 1)
+    }
+
+    private static func testLocalState() {
+        let suite = "com.tinycast.notes-local-state-test.\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suite) else { return check("a test suite opens", false) }
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let state = NotesLocalState(defaults: defaults)
+        check("the window auto-sizes until told otherwise", state.autoSizesWindow)
+        state.autoSizesWindow = false
+        check("turning auto-sizing off survives a relaunch", !NotesLocalState(defaults: defaults).autoSizesWindow)
     }
 
     private static func testRepositoryAndSearch() throws {
