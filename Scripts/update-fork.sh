@@ -146,34 +146,119 @@ else
     confirm_upstream
 fi
 
-# Writes stay inside the worktree (the session's directory) and git can't move a branch or push, so
-# nothing it does reaches `personal` or the installed app until the checks below pass.
+CLAUDE_TIMEOUT="${TINYCAST_UPDATE_CLAUDE_TIMEOUT:-1800}"
+CLAUDE_MAX_TURNS="${TINYCAST_UPDATE_CLAUDE_MAX_TURNS:-150}"
+# Why the last session stopped, for the failure notification; empty after a success.
+CLAUDE_FAILURE=""
+
+# Prints `resolved`, `sign-in: <line>` or `failed: <reason>`, and the session's reply on stderr.
+# Its own function: bash 3.2 misparses a quoted heredoc inside `$(…)` once the heredoc has a quote.
+classify_transcript() {
+    python3 -I - "$1" <<'EOF'
+import json, re, sys
+
+text = open(sys.argv[1], errors="replace").read()
+result = None
+for line in reversed(text.splitlines()):
+    if line.lstrip().startswith("{"):
+        try:
+            result = json.loads(line)
+            break
+        except ValueError:
+            pass
+reply = (result or {}).get("result") or ""
+# Only the CLI's own messages, never a reply that merely discusses the app's own OAuth code.
+errors = "\n".join(l for l in text.splitlines() if not l.lstrip().startswith("{"))
+if result is None or result.get("is_error"):
+    errors += "\n" + reply
+if reply:
+    print(reply.strip(), file=sys.stderr)
+lines = reply.strip().splitlines()
+if result and not result.get("is_error") and lines and lines[-1].startswith("RESULT: resolved"):
+    print("resolved")
+    sys.exit()
+# A login the session can't use: an expired one, or a future `-p` default that skips it.
+sign_in = re.search(
+    r"authentication_failed|not logged in|please run /login|login expired|invalid api key"
+    r"|oauth|apikeyhelper|anthropic_api_key|unauthori[sz]ed|\b401\b",
+    errors, re.IGNORECASE)
+if sign_in:
+    line = next((l for l in errors.splitlines() if sign_in.group(0).lower() in l.lower()), sign_in.group(0))
+    print("sign-in: " + line.strip()[:200])
+elif lines and lines[-1].startswith("RESULT: failed"):
+    print("failed: " + lines[-1][len("RESULT: failed"):].lstrip(" :-—")[:200])
+elif result:
+    print("failed: it ended without saying it resolved anything (" + str(result.get("subtype", "no subtype")) + ")")
+else:
+    first = next((l for l in errors.splitlines() if l.strip()), "no output")
+    print("failed: Claude Code didn't run: " + first.strip()[:200])
+EOF
+}
+
+# `--restricted` confines the file tools to the worktree and ignores every settings file and the
+# repo's hooks and MCP servers, so merged-in code can't widen what the session may do. Bash is
+# limited to the named commands: allowing `git *` would also allow `git -c`, which runs anything.
+# Nothing it does reaches `personal` or the installed app until the checks below pass.
 ask_claude() {
     local label=$1
     local task=$2
     local transcript="$REPO/build/update-claude-${label// /-}.json"
-    [ "$USE_CLAUDE" = 1 ] || return 1
-    command -v claude >/dev/null || { echo "! claude not found on PATH"; return 1; }
+    CLAUDE_FAILURE=""
+    [ "$USE_CLAUDE" = 1 ] || { CLAUDE_FAILURE="it is turned off"; return 1; }
+    command -v claude >/dev/null || { CLAUDE_FAILURE="claude isn't on PATH"; return 1; }
     notify "Claude Code is fixing the $label (this can take a few minutes)…"
     echo "▸ Claude Code: fixing the $label; transcript in $transcript"
+    # Job control gives the session its own process group, so the timeout also stops its builds.
+    set -m
     printf '%s' "$task" | claude -p --output-format json --no-session-persistence \
-        --permission-mode dontAsk \
-        --allowedTools Read Edit Write Glob Grep "Bash(git *)" "Bash(xcodegen *)" "Bash(xcodebuild *)" \
-        "Bash(./Scripts/run-tests.sh*)" "Bash(./Scripts/lint.sh*)" "Bash(./Scripts/format.sh*)" \
-        "Bash(node Scripts/*)" "Bash(grep *)" "Bash(ls *)" "Bash(head *)" "Bash(tail *)" "Bash(wc *)" \
-        --disallowedTools "Bash(git push*)" "Bash(git branch*)" "Bash(git update-ref*)" "Bash(git tag*)" \
-        "Bash(git worktree*)" "Bash(git remote*)" "Bash(git config*)" "Bash(git -C*)" \
-        >"$transcript" 2>&1
-    python3 -I - "$transcript" <<'EOF'
-import json, sys
-try:
-    result = json.load(open(sys.argv[1]))
-except Exception as error:
-    sys.exit(f"! Couldn't read Claude Code's result: {error}")
-print(result.get("result", "").strip())
-reply = result.get("result", "").strip().splitlines()
-sys.exit(0 if not result.get("is_error") and reply and reply[-1].startswith("RESULT: resolved") else 1)
-EOF
+        --restricted --strict-mcp-config --permission-mode dontAsk --max-turns "$CLAUDE_MAX_TURNS" \
+        --tools Read Edit Write Glob Grep Bash \
+        --allowedTools Read Edit Write Glob Grep \
+        "Bash(git status)" "Bash(git status *)" "Bash(git diff)" "Bash(git diff *)" \
+        "Bash(git log *)" "Bash(git show *)" "Bash(git blame *)" "Bash(git grep *)" \
+        "Bash(git ls-files *)" "Bash(git merge-base *)" "Bash(git rev-parse *)" "Bash(git cat-file *)" \
+        "Bash(git add *)" "Bash(git rm *)" "Bash(git mv *)" "Bash(git restore *)" \
+        "Bash(git checkout --ours *)" "Bash(git checkout --theirs *)" "Bash(git commit *)" \
+        "Bash(xcodegen generate)" "Bash(xcodegen generate *)" "Bash(xcodebuild *)" \
+        "Bash(./Scripts/run-tests.sh)" "Bash(./Scripts/run-tests.sh *)" "Bash(./Scripts/lint.sh)" \
+        "Bash(./Scripts/format.sh)" "Bash(node Scripts/check-localizations.js)" \
+        "Bash(node Scripts/check-settings-search.js)" \
+        "Bash(ls *)" "Bash(grep *)" "Bash(head *)" "Bash(tail *)" "Bash(wc *)" \
+        --disallowedTools "Bash(git push*)" "Bash(git *--output*)" \
+        >"$transcript" 2>&1 &
+    local session=$!
+    set +m
+    local group
+    group="$(ps -o pgid= -p "$session" | tr -d ' ')"
+    ( sleep "$CLAUDE_TIMEOUT"; kill -TERM -- "-${group:-$session}" 2>/dev/null ) &
+    local watchdog=$!
+    wait "$session"
+    local exit_code=$?
+    pkill -P "$watchdog" 2>/dev/null
+    kill "$watchdog" 2>/dev/null
+    if [ "$exit_code" = 143 ]; then
+        CLAUDE_FAILURE="it was stopped after $((CLAUDE_TIMEOUT / 60)) minutes"
+        return 1
+    fi
+    local verdict
+    verdict="$(classify_transcript "$transcript")"
+    case "$verdict" in
+        resolved) return 0 ;;
+        sign-in:*) CLAUDE_FAILURE="Claude Code couldn't sign in (${verdict#sign-in: })"; return 2 ;;
+        *) CLAUDE_FAILURE="${verdict#failed: }"; return 1 ;;
+    esac
+}
+
+# A sign-in failure is its own message: how the session should authenticate is the user's call.
+claude_stopped() {
+    case "$CLAUDE_FAILURE" in
+        "Claude Code couldn't sign in"*)
+            fail "$CLAUDE_FAILURE. Nothing was installed; it needs a login it can use from a script (see FORK.md)." ;;
+        "")
+            fail "Claude Code's attempt to $1 didn't pass the update's checks. See build/update.log; the attempt is kept in build/update-worktree, and nothing was installed." ;;
+        *)
+            fail "Claude Code couldn't $1: $CLAUDE_FAILURE. See build/update.log; nothing was installed." ;;
+    esac
 }
 
 # What a finished merge looks like, checked here rather than taken from the session's own word.
@@ -186,7 +271,9 @@ merge_is_complete() {
 }
 
 AFTERWORD="
-Follow AGENTS.md and FORK.md, and fix any doc the change made wrong. Verify before committing:
+Read AGENTS.md and FORK.md first and follow them, and fix any doc the change made wrong. Only the
+commands you need are permitted; if one is refused, find another way with the ones that work rather
+than stopping. Verify before committing:
 the Debug build (\`xcodebuild -project Tinycast.xcodeproj -scheme Tinycast -configuration Debug
 -derivedDataPath build/DebugDerivedData ARCHS=arm64 build\`) succeeds with no new warnings,
 \`./Scripts/lint.sh\` is clean, and \`./Scripts/run-tests.sh <harness>\` passes for every area you
@@ -260,7 +347,7 @@ if ! $REBUILD && ! git merge -q --no-edit -m "Merge upstream v$VERSION" "$UPSTRE
             || fail "Couldn't regenerate the conflicting project file."
     elif [ "$USE_CLAUDE" = 1 ]; then
         ask_claude "merge conflict" "$(conflict_task "$CONFLICTS")" && merge_is_complete \
-            || fail "Claude Code couldn't finish the merge (conflict in: ${FILES}). See build/update.log; the attempt is kept in build/update-worktree, and nothing was installed."
+            || claude_stopped "resolve the conflict in ${FILES% }"
         FIXED_BY_CLAUDE="resolved the conflict in ${FILES}"
     else
         git merge --abort
@@ -278,7 +365,7 @@ if ! build_release; then
     $REBUILD || [ "$USE_CLAUDE" != 1 ] \
         && fail "Build failed, see build/update.log. The merge is kept in build/update-worktree."
     ask_claude "build" "$(build_task "${ERRORS:-$(tail -60 "$BUILD_LOG")}")" && merge_is_complete && build_release \
-        || fail "Build still fails after Claude Code's fix. See build/update.log; nothing was installed."
+        || claude_stopped "fix the build"
     FIXED_BY_CLAUDE="${FIXED_BY_CLAUDE:+$FIXED_BY_CLAUDE and }fixed the build"
 fi
 MERGED="$(git rev-parse HEAD)"

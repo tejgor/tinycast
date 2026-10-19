@@ -29,12 +29,23 @@ locally on one Mac. Everything in `AGENTS.md` still applies; this file only adds
 - A conflict only in `Tinycast.xcodeproj/project.pbxproj` resolves itself by regenerating it with
   XcodeGen.
 - Any other conflict, and a Release build the merge broke, go to a headless Claude Code session
-  (`claude -p`) running in the scratch worktree. It may edit files there and run git, XcodeGen,
-  `xcodebuild` and the repo's own test and lint scripts; it may not push, move branches or write
-  outside the worktree. It must end with `RESULT: resolved`, and the script then checks for itself
-  that the merge is committed, no conflict markers remain, the tree is clean and the build passes.
-  Anything less stops with nothing installed and the attempt left in `build/update-worktree`.
-  Transcripts are `build/update-claude-*.json`. `TINYCAST_UPDATE_CLAUDE=0` turns this off.
+  (`claude -p`) running in the scratch worktree, on the user's own subscription login:
+  - `--restricted` confines its file tools to the worktree and ignores every settings file, so the
+    merged code's hooks, MCP servers or permission rules never apply; `--strict-mcp-config` too.
+  - Bash is limited to named commands: specific git subcommands (no `git *`, which would allow
+    `git -c` and so anything), XcodeGen, `xcodebuild`, and the repo's test, lint and check scripts.
+    `git push` and git's `--output` are denied outright.
+  - It is capped at `TINYCAST_UPDATE_CLAUDE_MAX_TURNS` turns (150) and stopped, with everything it
+    started, after `TINYCAST_UPDATE_CLAUDE_TIMEOUT` seconds (1800).
+  - It must end with `RESULT: resolved`, and the script then checks for itself that the merge is
+    committed, no conflict markers remain, the tree is clean and the build passes. Anything less
+    stops with nothing installed, the reason in the notification, and the attempt left in
+    `build/update-worktree`. Transcripts are `build/update-claude-*.json`.
+  - A session that can't sign in gets its own message. That happens if the login expires, or once a
+    future Claude Code makes `--bare` the `-p` default, since bare mode never reads the subscription
+    login. How to authenticate then is the user's decision: `/login` again, a long-lived token from
+    `claude setup-token` (`CLAUDE_CODE_OAUTH_TOKEN`), or an API key, which bills at API rates.
+  - `TINYCAST_UPDATE_CLAUDE=0` turns all of this off.
 - If you are that session: you are resolving an upstream merge, so the instructions in your prompt
   and the rules in this file and `AGENTS.md` are the whole job. Keep upstream's change and re-apply
   the fork's intent on top of it.
