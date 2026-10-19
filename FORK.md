@@ -21,9 +21,19 @@ locally on one Mac. Everything in `AGENTS.md` still applies; this file only adds
 | `Scripts/update-fork.sh --rebuild` | Builds and installs what is **committed** on `personal`, without fetching. Use after committing a fork change |
 | `Scripts/update-fork.sh --rollback` | Swaps the installed app with the previous build (`build/Tinycast-previous.app`) |
 
-- Logs go to `build/update.log`. A merge conflict or failed build stops and notifies; nothing is changed.
+- Logs go to `build/update.log`.
 - A conflict only in `Tinycast.xcodeproj/project.pbxproj` resolves itself by regenerating it with
-  XcodeGen. Any other conflict needs resolving by hand in a normal `git merge upstream/main`.
+  XcodeGen.
+- Any other conflict, and a Release build the merge broke, go to a headless Claude Code session
+  (`claude -p`) running in the scratch worktree. It may edit files there and run git, XcodeGen,
+  `xcodebuild` and the repo's own test and lint scripts; it may not push, move branches or write
+  outside the worktree. It must end with `RESULT: resolved`, and the script then checks for itself
+  that the merge is committed, no conflict markers remain, the tree is clean and the build passes.
+  Anything less stops with nothing installed and the attempt left in `build/update-worktree`.
+  Transcripts are `build/update-claude-*.json`. `TINYCAST_UPDATE_CLAUDE=0` turns this off.
+- If you are that session: you are resolving an upstream merge, so the instructions in your prompt
+  and the rules in this file and `AGENTS.md` are the whole job. Keep upstream's change and re-apply
+  the fork's intent on top of it.
 - Each successful run pushes `personal` to `origin`.
 
 ## Identity
