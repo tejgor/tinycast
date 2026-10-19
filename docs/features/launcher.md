@@ -825,8 +825,12 @@ not drag.
 
 ## Quitting and restarting apps
 
-`RunningAppsMonitor` (live from `NSWorkspace` launch/terminate notifications) drives both the row's
-running dot and the availability of the running-only actions:
+`RunningAppsMonitor` (live from `NSWorkspace` launch/terminate notifications, and from a KVO
+observation of `runningApplications` itself) drives both the row's running dot and the availability of
+the running-only actions. While anything in the process KVO-observes that list — `HyperKeyManager`
+does from launch — the terminate notification arrives before the list drops the app, which is still
+there with `isTerminated` set; reading it then left a quit app's dot lit until the next launch or quit.
+So a refresh skips terminated apps, and the list's own change refreshes again:
 
 - **Quit Application** — a row of an app's ⌘K Actions menu, shown only while that app is
   running, also bound to **⌃⇧Q** on the selected row. The chord guard mirrors the menu row's
