@@ -116,8 +116,14 @@ failed flush retains the draft for retry.
 - **Search Notes** shows the same panel with the switcher open and its search field focused.
 
 Command-N creates, Command-P opens or refocuses the switcher, Command-O opens the Notes folder, and
-Command-F opens AppKit's find bar in the active note. Escape closes the find bar or switcher before
-hiding; Command-W and the red traffic light both hide directly. Hiding
+Command-F opens AppKit's find bar in the active note. ⌘[ and ⌘] walk `NoteHistory`, the notes shown
+this session, like a browser's back and forward: opening a note drops what was ahead, a rename carries
+its entries, and a note that no longer exists is skipped. ⌘+ (or ⌘=), ⌘− and ⌘0 step the note's zoom
+along `NotesLocalState.zoomSteps` and reset it; zoom is the scroll view's magnification from the
+top-left, with the text view kept to the clip view's width so lines rewrap, and the window fit scales
+the text height by it. Escape closes the find bar or switcher before
+hiding — or, with Settings > Notes > **Escape Key Loses Focus**, hands the keyboard back to the window
+or app that had it and leaves the note on screen; Command-W and the red traffic light both hide directly. Hiding
 restores the prior external application or Tinycast window and flushes without delaying the order-out —
 but only while that app is still the frontmost one, so closing a window the user has already left behind
 leaves them in whatever app they moved to.
@@ -125,7 +131,15 @@ Command-Q is bound to nothing app-wide, so no chord over Notes can quit Tinycast
 
 Both windows are one `NotesPanel`, a non-activating floating panel that owns the Escape rule and reads
 ⌘⌫. They differ only in style mask and in the `commandChords` their controller installs: the note window
-claims ⌘N, ⌘P, ⌘O, ⌘F and ⌘W, and the switcher reads ⌘N plus ⌘W and ⌘P as dismissals.
+claims ⌘N, ⌘P, ⌘O, ⌘F, ⌘W, ⌘[, ⌘], ⌘=, ⌘−, ⌘0 and ⇧⌘+ (`shiftCommandChords`), and the switcher reads
+⌘N plus ⌘W and ⌘P as dismissals.
+
+Settings > Notes > **Show Notes Button in Menu Bar** adds `NotesMenuBarButton`, a status item whose
+click toggles the window like Show Notes. The footer's count is a button: a click switches it between
+characters and words (`NotesLocalState.countsWords`), where a word is any whitespace-separated run
+holding a letter or digit, so list markers and checkboxes are not counted. Duplicate Note copies the
+active note beside it and opens the copy, unnamed when the original is; Delete All Notes confirms, then
+moves every note to the Trash.
 
 AppKit draws the note window's chrome. Its 52-point title bar holds the traffic lights, the centred
 active title, and one frosted capsule of Create, Browse, and Open Folder. The title is drawn, not
@@ -256,16 +270,17 @@ replacement does not, and Return at the end of a long list would otherwise leave
 | --- | --- |
 | ⌘Z, ⇧⌘Z | undo, redo |
 | ⌘B, ⌘I, ⌘E | bold, italic, inline code |
-| ⇧⌘X | strikethrough |
+| ⇧⌘S | strikethrough |
 | ⌥⌘C | code block |
 | ⇧⌘B | quote |
-| ⌘K | link |
+| ⌘L | link |
+| ⌘↵ | toggle the caret line's checkbox |
 | ⇧⌘7, ⇧⌘8, ⇧⌘9 | numbered, bullet, task list |
 | ⌥⌘1, ⌥⌘2, ⌥⌘3 | heading 1, 2, 3 |
 | ⌥⌘0 | plain paragraph |
 
 Digits match by key code. The text view sees these chords before `NotesPanel` claims its own, and none
-collide. In a note, ⌘E replaces AppKit's Use Selection for Find.
+collide. Link and strikethrough sit on Raycast Notes' ⌘L and ⇧⌘S, which leaves ⌘K for the action panel. In a note, ⌘E replaces AppKit's Use Selection for Find.
 
 AppKit still owns typing, selection, Cut, Copy, Paste, Select All, Find, marked text, emoji, combining
 characters and undo grouping. The editor handles ⌘Z and ⇧⌘Z while focused, including in the

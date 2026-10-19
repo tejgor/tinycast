@@ -38,6 +38,8 @@ final class NotesCoordinator {
     /// The heading button in the panel's flipped content space, reported by the bar as it lays out.
     @ObservationIgnored var headingButtonFrame: CGRect = .zero
     private var switcherRename = NoteSwitcherRenameState()
+    @ObservationIgnored private var history = NoteHistory()
+    @ObservationIgnored private lazy var menuBarButton = NotesMenuBarButton { [weak self] in self?.toggle() }
     private var presentationGeneration = 0
 
     @ObservationIgnored private let saveFormattingBarExpanded: @Sendable (Bool) -> Void
@@ -60,6 +62,8 @@ final class NotesCoordinator {
         self.saveFormattingBarExpanded = saveFormattingBarExpanded
         self.local = local
         store.onIssue = { [weak self] issue in self?.present(issue) }
+        trackHistory()
+        trackMenuBarButton()
     }
 
     var editorInput: NoteEditorInput {
@@ -72,7 +76,57 @@ final class NotesCoordinator {
     var hasActiveNote: Bool { store.activeID != nil }
     /// UTF-16 units, straight off the text storage: the only length TextKit hands back in O(1).
     var characterCountLabel: String {
-        String(localized: "\(characterCount) characters")
+        guard local.countsWords else { return String(localized: "\(characterCount) characters") }
+        // Markdown markers such as `-` and `[ ]` hold no letter or digit, so they are not words.
+        let words = store.source.split(whereSeparator: \.isWhitespace)
+            .count { $0.contains { $0.isLetter || $0.isNumber } }
+        return String(localized: "\(words) words")
+    }
+
+    func toggleCountMode() {
+        local.countsWords.toggle()
+    }
+
+    var zoom: CGFloat { CGFloat(local.zoom) }
+
+    func zoomIn() { setZoom { $0.stepZoom(by: 1) } }
+
+    func zoomOut() { setZoom { $0.stepZoom(by: -1) } }
+
+    func resetZoom() { setZoom { $0.zoom = 1 } }
+
+    private func setZoom(_ change: (NotesLocalState) -> Void) {
+        change(local)
+        windowController.refit()
+    }
+
+    // MARK: - History
+
+    func goBack() { stepHistory(-1) }
+
+    func goForward() { stepHistory(1) }
+
+    private func stepHistory(_ offset: Int) {
+        let existing = Set(store.summaries.map(\.id))
+        guard let id = history.step(offset, exists: existing.contains) else { return }
+        select(id)
+    }
+
+    private func trackMenuBarButton() {
+        withObservationTracking {
+            menuBarButton.setShown(settings.notesEnabled && settings.notesShowsMenuBarButton)
+        } onChange: { [weak self] in
+            Task { @MainActor in self?.trackMenuBarButton() }
+        }
+    }
+
+    /// Re-armed after every change, so each note the window shows lands in the history once.
+    private func trackHistory() {
+        withObservationTracking {
+            if let id = store.activeID { history.visit(id) }
+        } onChange: { [weak self] in
+            Task { @MainActor in self?.trackHistory() }
+        }
     }
 
     var searchQueryBinding: Binding<String> {
@@ -176,6 +230,8 @@ final class NotesCoordinator {
             closeHeadingMenu()
         } else if isSwitcherPresented {
             closeSwitcher()
+        } else if settings.notesEscapeLosesFocus {
+            windowController.releaseFocus()
         } else {
             hide()
         }
@@ -258,9 +314,36 @@ final class NotesCoordinator {
                 return
             }
             switcherSelection = renamedID
+            history.rename(id, to: renamedID)
             if renamedID == store.activeID, permitsCompletion(generation) {
                 windowController.show(focusEditor: false)
             }
+        }
+    }
+
+    func duplicateActiveNote() {
+        guard let id = store.activeID else { return }
+        runOperation { [weak self] generation in
+            guard let self, await store.duplicate(id), permitsCompletion(generation) else { return }
+            windowController.show(focusEditor: true)
+        }
+    }
+
+    func trashAllNotes() {
+        let count = store.summaries.count
+        guard count > 0 else { return }
+        runOperation { [weak self] generation in
+            guard let self else { return }
+            let confirmed = await core.confirm(
+                title: String(localized: "Move all \(count) notes to Trash?"),
+                message: String(localized: "You can recover them from the Trash in Finder."),
+                symbol: nil,
+                confirmTitle: String(localized: "Move to Trash"))
+            guard confirmed, settings.notesEnabled, !Task.isCancelled else { return }
+            _ = await store.trashAll()
+            closeSwitcher(focusEditor: false)
+            guard permitsCompletion(generation) else { return }
+            windowController.show(focusEditor: false)
         }
     }
 

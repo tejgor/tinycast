@@ -388,6 +388,12 @@ enum SettingsSearchCatalog {
             .notesOptions, "Show Formatting Bar",
             keywords: ["toolbar", "format bar", "buttons", "bold", "heading", "markdown"]),
         .init(
+            .notesOptions, "Escape Key Loses Focus",
+            keywords: ["esc", "close", "hide", "focus", "floating"]),
+        .init(
+            .notesOptions, "Show Notes Button in Menu Bar",
+            keywords: ["menu bar", "status", "icon", "toggle", "toolbar"]),
+        .init(
             .notesOptions, "Notes Folder",
             keywords: ["location", "path", "dotfiles", "files", "markdown"]),
         .init(

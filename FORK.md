@@ -69,6 +69,13 @@ locally on one Mac. Everything in `AGENTS.md` still applies; this file only adds
 - Markdown tables in Notes render as a grid (`NoteMarkdown.Table`, `NoteTableGrid`, notes docs).
 - A Table button in the Notes formatting bar inserts an empty three-column table
   (`NoteEditAction.insertTable`); the minimum note window grew from 440 to 470 points to fit it.
+- Notes behaves more like Raycast Notes (see `docs/features/notes.md`):
+  - a hand-sized window keeps its size (`NotesLocalState.autoSizesWindow`), and planned edits such as
+    Return in a list scroll the caret into view;
+  - ⌘L link, ⇧⌘S strikethrough, ⌘↵ checkbox, ⌘[ / ⌘] history (`NoteHistory`), ⌘+ / ⌘− / ⌘0 zoom,
+    a character/word count toggle, Duplicate Note, Delete All Notes;
+  - Settings → Notes → Escape Key Loses Focus and Show Notes Button in Menu Bar (fork-only, not in backups).
+  - Device-local Notes state lives in `NotesLocalState` (one `AppCore` line), not in `AppSettings`.
 - Settings → General → Transparency thins the launcher's scrim over its glass
   (`AppSettings.paletteTransparency`, `appearance.transparency` in `settings.json`; not in backups).
 

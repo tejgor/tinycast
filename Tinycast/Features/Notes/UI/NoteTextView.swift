@@ -133,6 +133,12 @@ final class NoteTextView: NSTextView, InjectableTextView {
             }
             return true
         }
+        if rendersMarkdown, modifiers == .command, Self.returnKeys.contains(event.keyCode) {
+            if !event.isARepeat, let editing, let line = editing.markdown.lineIndex(at: selectedRange().location) {
+                perform(.toggleTask(lineIndex: line))
+            }
+            return true
+        }
         guard rendersMarkdown, let action = Self.chord(for: event) else {
             return super.performKeyEquivalent(with: event)
         }
@@ -161,6 +167,9 @@ final class NoteTextView: NSTextView, InjectableTextView {
         return true
     }
 
+    /// ⌘↵ toggles the caret line's checkbox; Return and Enter both count.
+    private static let returnKeys: Set<UInt16> = [0x24, 0x4C]
+
     /// The digit key codes, stated here so a local chord needs no Carbon.
     private enum DigitKey {
         static let zero: UInt16 = 0x1D
@@ -182,11 +191,11 @@ final class NoteTextView: NSTextView, InjectableTextView {
             case "b": return .toggleInline(.bold)
             case "i": return .toggleInline(.italic)
             case "e": return .toggleInline(.code)
-            case "k": return .toggleLink
+            case "l": return .toggleLink
             default: return nil
             }
         case [.command, .shift]:
-            if key == "x" { return .toggleInline(.strikethrough) }
+            if key == "s" { return .toggleInline(.strikethrough) }
             if key == "b" { return .toggleQuote }
             switch event.keyCode {
             case DigitKey.seven: return .toggleList(.ordered)

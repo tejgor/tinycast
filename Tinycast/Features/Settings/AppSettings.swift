@@ -400,6 +400,16 @@ final class AppSettings {
         didSet { defaults.set(notesShowsFormattingBar, forKey: Key.notesShowsFormattingBar.rawValue) }
     }
 
+    /// Escape hands the keyboard back to the previous app and leaves the note on screen.
+    var notesEscapeLosesFocus: Bool {
+        didSet { defaults.set(notesEscapeLosesFocus, forKey: Key.notesEscapeLosesFocus.rawValue) }
+    }
+
+    /// A menu bar button that shows or hides the notes window.
+    var notesShowsMenuBarButton: Bool {
+        didSet { defaults.set(notesShowsMenuBarButton, forKey: Key.notesShowsMenuBarButton.rawValue) }
+    }
+
     /// The notes folder as the user wrote it, `~` allowed; nil keeps it in Application Support.
     var notesFolder: String? {
         didSet { defaults.set(notesFolder, forKey: Key.notesFolder.rawValue) }
@@ -793,6 +803,8 @@ final class AppSettings {
         notesShowsFormattingBar =
             defaults.object(forKey: Key.notesShowsFormattingBar.rawValue) == nil
             || defaults.bool(forKey: Key.notesShowsFormattingBar.rawValue)
+        notesEscapeLosesFocus = defaults.bool(forKey: Key.notesEscapeLosesFocus.rawValue)
+        notesShowsMenuBarButton = defaults.bool(forKey: Key.notesShowsMenuBarButton.rawValue)
         notesFolder = defaults.string(forKey: Key.notesFolder.rawValue)
         aiEnabled = defaults.bool(forKey: Key.aiEnabled.rawValue)
         mcpEnabled = defaults.bool(forKey: Key.mcpEnabled.rawValue)

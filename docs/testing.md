@@ -639,6 +639,13 @@ caches, TCC grants and login item, so this cannot disturb an installed copy.
 - Dragging a selection across rendered lines does not jump under the pointer; the lines reveal on
   mouse-up
 - Clicking another app renders the whole note; clicking back reveals the caret line again
+- Return at the end of a long list scrolls the new item into view
+- Dragging the note window to a new size keeps that size through edits, note switches and hiding
+- ⌘[ and ⌘] move back and forward through the notes opened this session; ⌘+, ⌘− and ⌘0 zoom the note
+  and its text rewraps; ⌘↵ toggles the caret line's checkbox; ⌘L makes a link and ⇧⌘S strikes through
+- Clicking the footer count switches between characters and words, and the choice survives a relaunch
+- With Escape Key Loses Focus on, Escape returns to the previous app and the note stays on screen
+- Show Notes Button in Menu Bar adds a menu bar item that shows and hides the window
 - Inside a code block both fences show and Markdown inside it stays literal
 - A table renders as a grid in Dark and Light: filled header, rounded corners, one hairline at every
   seam, `:--` / `:-:` / `--:` alignment, and bold, links and code inside cells; narrowing the window

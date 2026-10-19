@@ -26,6 +26,16 @@ struct NotesSettingsView: View {
                     SettingsRowTitle(.notesOptions, "Show Formatting Bar")
                 }
                 .settingsEnabled(settings.notesEnabled && settings.notesRendersMarkdown)
+                Toggle(isOn: $settings.notesEscapeLosesFocus) {
+                    SettingsRowTitle(.notesOptions, "Escape Key Loses Focus")
+                    Text("Escape returns to the previous app and keeps the note on screen.")
+                }
+                .settingsEnabled(settings.notesEnabled)
+                Toggle(isOn: $settings.notesShowsMenuBarButton) {
+                    SettingsRowTitle(.notesOptions, "Show Notes Button in Menu Bar")
+                    Text("Click it to show or hide the notes window.")
+                }
+                .settingsEnabled(settings.notesEnabled)
                 LabeledContent {
                     if settings.notesFolder != nil {
                         Button(

@@ -8,6 +8,8 @@ struct NoteEditorView: NSViewRepresentable {
     let onCharacterCountChange: (NoteEditorInput, Int) -> Void
     let onFormattingChange: (NoteEditorInput, NoteFormatting) -> Void
     let onReady: (NoteTextView) -> Void
+    /// Notes' own zoom, separate from Interface Size: 1 is actual size.
+    var zoom: CGFloat = 1
 
     func makeCoordinator() -> Coordinator {
         Coordinator(parent: self)
@@ -30,6 +32,8 @@ struct NoteEditorView: NSViewRepresentable {
         scrollView.documentView = textView
         context.coordinator.textView = textView
         context.coordinator.install(input, resetUndo: false)
+        context.coordinator.trackWidth(of: scrollView)
+        context.coordinator.applyZoom(zoom, in: scrollView)
         onReady(textView)
         return scrollView
     }
@@ -38,6 +42,7 @@ struct NoteEditorView: NSViewRepresentable {
         context.coordinator.parent = self
         context.coordinator.update(input)
         context.coordinator.setRendersMarkdown(rendersMarkdown)
+        context.coordinator.applyZoom(zoom, in: scrollView)
     }
 
     @MainActor
@@ -75,6 +80,37 @@ struct NoteEditorView: NSViewRepresentable {
 
         deinit {
             for observer in undoObservers { NotificationCenter.default.removeObserver(observer) }
+        }
+
+        private var clipObserver: NotificationToken?
+
+        /// Magnifies from the top-left, so the first line stays put and nothing is cropped sideways.
+        func applyZoom(_ zoom: CGFloat, in scrollView: NSScrollView) {
+            guard scrollView.magnification != zoom else { return }
+            scrollView.setMagnification(zoom, centeredAt: .zero)
+            fitWidth(to: scrollView.contentView)
+        }
+
+        /// Magnification scales drawing, not the wrap width, so the text view is kept to what shows.
+        func trackWidth(of scrollView: NSScrollView) {
+            let clipView = scrollView.contentView
+            clipView.postsFrameChangedNotifications = true
+            let center = NotificationCenter.default
+            clipObserver = NotificationToken(
+                center.addObserver(
+                    forName: NSView.frameDidChangeNotification, object: clipView, queue: .main
+                ) { [weak self, weak clipView] _ in
+                    MainActor.assumeIsolated {
+                        guard let self, let clipView else { return }
+                        self.fitWidth(to: clipView)
+                    }
+                },
+                center: center)
+        }
+
+        private func fitWidth(to clipView: NSClipView) {
+            guard let textView, textView.frame.width != clipView.bounds.width else { return }
+            textView.setFrameSize(NSSize(width: clipView.bounds.width, height: textView.frame.height))
         }
 
         private func attach() {

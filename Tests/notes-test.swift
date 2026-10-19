@@ -24,9 +24,50 @@ struct NotesTests {
         try await testStoreRecoversFromFailures()
         try await testStoreRelocates()
         testLocalState()
+        try await testDuplicateAndTrashAll()
+        testHistory()
 
         print(failures == 0 ? "Notes tests passed" : "\(failures) tests failed")
         exit(failures == 0 ? 0 : 1)
+    }
+
+    private static func testDuplicateAndTrashAll() async throws {
+        let root = temporaryRoot("duplicate")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = NotesStore(repository: try repository(in: root))
+        _ = await store.create()
+        store.updateSource("first line\nbody")
+        let original = try require(store.activeID)
+        let duplicated = await store.duplicate(original)
+        let copy = try require(store.activeID)
+        check(
+            "Duplicate Note opens an unnamed copy holding the same text",
+            duplicated && copy != original && store.source == "first line\nbody"
+                && store.summaries.count == 2 && store.summaries.first { $0.id == copy }?.firstLine == "first line")
+        let named = try require(await store.rename(original, to: "Plan"))
+        _ = await store.duplicate(named)
+        check("a named note's copy takes the next free name", store.activeID?.rawValue == "Plan 2.md")
+        let cleared = await store.trashAll()
+        check(
+            "Delete All Notes empties the collection",
+            cleared && store.summaries.isEmpty && store.activeID == nil)
+    }
+
+    private static func testHistory() {
+        let (a, b, c) = (NoteID(rawValue: "a.md"), NoteID(rawValue: "b.md"), NoteID(rawValue: "c.md"))
+        var history = NoteHistory()
+        for id in [a, b, c] { history.visit(id) }
+        check("⌘[ goes back a note", history.step(-1) { _ in true } == b)
+        history.visit(a)
+        check("opening a note drops what was ahead", history.step(1) { _ in true } == nil)
+        var renamed = NoteHistory()
+        for id in [a, b] { renamed.visit(id) }
+        renamed.rename(a, to: c)
+        check("a rename carries the history with it", renamed.step(-1) { _ in true } == c)
+        var skipping = NoteHistory()
+        for id in [a, b, c] { skipping.visit(id) }
+        check("going back skips a deleted note", skipping.step(-1) { $0 != b } == a)
+        check("revisiting the current note adds nothing", { var h = NoteHistory(); h.visit(a); h.visit(a); return h.entries.count == 1 }())
     }
 
     private static func testLocalState() {

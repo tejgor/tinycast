@@ -25,14 +25,14 @@ struct NoteFormattingBar: View {
             $0.inlineStyles.contains(.italic)
         },
         Control(
-            symbol: "strikethrough", title: String(localized: "Strikethrough"), shortcut: "⇧⌘X",
+            symbol: "strikethrough", title: String(localized: "Strikethrough"), shortcut: "⇧⌘S",
             action: .toggleInline(.strikethrough)
         ) { $0.inlineStyles.contains(.strikethrough) },
         Control(
             symbol: "chevron.left.forwardslash.chevron.right", title: String(localized: "Inline Code"),
             shortcut: "⌘E", action: .toggleInline(.code)
         ) { $0.inlineStyles.contains(.code) },
-        Control(symbol: "link", title: String(localized: "Link"), shortcut: "⌘K", action: .toggleLink) {
+        Control(symbol: "link", title: String(localized: "Link"), shortcut: "⌘L", action: .toggleLink) {
             $0.isLink
         }
     ]

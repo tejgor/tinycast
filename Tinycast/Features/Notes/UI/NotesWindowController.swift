@@ -44,6 +44,18 @@ final class NotesWindowController: NSObject, NSWindowDelegate {
         }
     }
 
+    /// The note stays on screen; the keyboard goes back to whatever had it before the window.
+    func releaseFocus() {
+        guard let panel, panel.isVisible, panel.isKeyWindow else { return }
+        if let previousOwnWindow, previousOwnWindow.isVisible {
+            previousOwnWindow.makeKeyAndOrderFront(nil)
+        } else if let previousApp, !previousApp.isTerminated {
+            previousApp.activate()
+        } else {
+            panel.resignKey()
+        }
+    }
+
     func editorReady(_ textView: NoteTextView) {
         editor = textView
         observeLayout(of: textView)
@@ -166,10 +178,12 @@ final class NotesWindowController: NSObject, NSWindowDelegate {
             let editor, let clipView = editor.enclosingScrollView?.contentView,
             let visibleFrame = (panel.screen ?? NSScreen.main)?.visibleFrame
         else { return }
-        let textHeight = editor.textHeight(upTo: Theme.Size.noteWindowMaxHeight)
+        // Zoom magnifies the text, so its height is scaled into the window's points.
+        let scale = editor.enclosingScrollView?.magnification ?? 1
+        let textHeight = editor.textHeight(upTo: Theme.Size.noteWindowMaxHeight / scale) * scale
         let frame = NoteWindowPlacement.fitting(
             panel.frame,
-            toHeight: panel.frame.height - clipView.bounds.height + textHeight,
+            toHeight: panel.frame.height - clipView.frame.height + textHeight,
             within: Theme.Size.noteWindow.height...Theme.Size.noteWindowMaxHeight,
             in: visibleFrame)
         guard frame != panel.frame else { return }
@@ -207,7 +221,15 @@ final class NotesWindowController: NSObject, NSWindowDelegate {
             "p": { [weak coordinator] in coordinator?.searchNotes() },
             "o": { [weak coordinator] in coordinator?.openNotesFolder() },
             "f": { [weak self] in self?.editor?.find(.showFindInterface) },
-            "w": { [weak panel] in panel?.performClose(nil) }
+            "w": { [weak panel] in panel?.performClose(nil) },
+            "[": { [weak coordinator] in coordinator?.goBack() },
+            "]": { [weak coordinator] in coordinator?.goForward() },
+            "=": { [weak coordinator] in coordinator?.zoomIn() },
+            "-": { [weak coordinator] in coordinator?.zoomOut() },
+            "0": { [weak coordinator] in coordinator?.resetZoom() }
+        ]
+        panel.shiftCommandChords = [
+            "+": { [weak coordinator] in coordinator?.zoomIn() }
         ]
         panel.optionCommandChords = [
             "t": { [weak coordinator] in coordinator?.toggleFormattingBar() }

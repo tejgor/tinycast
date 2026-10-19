@@ -41,6 +41,8 @@ enum AppSettingsKey: String, CaseIterable {
     case notesEnabled = "notesEnabled"
     case notesRendersMarkdown = "notesRendersMarkdown"
     case notesShowsFormattingBar = "notesShowsFormattingBar"
+    case notesEscapeLosesFocus = "notesEscapeLosesFocus"
+    case notesShowsMenuBarButton = "notesShowsMenuBarButton"
     case notesFolder = "notesFolder"
     case customCommandsEnabled = "customCommandsEnabled"
     case customCommandsShowInLauncher = "customCommandsShowInLauncher"

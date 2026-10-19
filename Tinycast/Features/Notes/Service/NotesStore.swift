@@ -244,6 +244,66 @@ final class NotesStore {
         }
     }
 
+    /// A copy beside the original, opened in its place; an unnamed note's copy stays unnamed.
+    @discardableResult
+    func duplicate(_ id: NoteID) async -> Bool {
+        guard await flush() else { return false }
+        cancelSearch()
+        let repository = repository
+        let named = summaries.first { $0.id == id && $0.firstLine == nil }?.title
+        let result = await detached {
+            let source = try repository.load(id).source
+            let copy = try named.map { try repository.create(title: $0) } ?? repository.create()
+            try repository.save(id: copy.id, source: source)
+            return (try repository.load(copy.id), try repository.list())
+        } recover: {
+            repository.fileURL(for: id)
+        }
+        switch result {
+        case .success(let payload):
+            apply(payload.0, summaries: payload.1)
+            return true
+        case .failure(let failure):
+            publish(.operation(failure))
+            return false
+        }
+    }
+
+    /// Every note to the Trash; a failure part way leaves the rest listed, as one trash would.
+    @discardableResult
+    func trashAll() async -> Bool {
+        guard await flush() else { return false }
+        cancelSearch()
+        let repository = repository
+        let ids = summaries.map(\.id)
+        let result = await detached {
+            var stopped: NotesRepository.Failure?
+            for id in ids {
+                do throws(NotesRepository.Failure) { try repository.trash(id: id) } catch {
+                    stopped = error
+                    break
+                }
+            }
+            return (stopped, try repository.list())
+        } recover: {
+            repository.notesDirectory
+        }
+        switch result {
+        case .success(let (stopped, remaining)):
+            if let activeID, remaining.contains(where: { $0.id == activeID }) {
+                summaries = remaining
+            } else {
+                apply(nil, summaries: remaining)
+            }
+            guard let stopped else { return true }
+            publish(.operation(stopped))
+            return false
+        case .failure(let failure):
+            publish(.operation(failure))
+            return false
+        }
+    }
+
     func updateSearchQuery(_ updated: String) {
         searchQuery = updated
         searchTask?.cancel()

@@ -73,6 +73,8 @@ enum SettingsFileKey: String, CaseIterable, Sendable {
     case notesEnabled = "notes.enabled"
     case notesRendersMarkdown = "notes.rendersMarkdown"
     case notesShowsFormattingBar = "notes.showsFormattingBar"
+    case notesEscapeLosesFocus = "notes.escapeLosesFocus"
+    case notesShowsMenuBarButton = "notes.showsMenuBarButton"
     case notesFolder = "notes.folder"
     case notesCommands = "notes.commands"
     case snippetsShowInLauncher = "snippets.showInLauncher"

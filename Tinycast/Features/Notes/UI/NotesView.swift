@@ -57,7 +57,8 @@ struct NotesView: View {
                 onSourceChange: notes.updateSource,
                 onCharacterCountChange: notes.updateCharacterCount,
                 onFormattingChange: notes.updateFormatting,
-                onReady: notes.editorReady
+                onReady: notes.editorReady,
+                zoom: notes.zoom
             )
             if notes.showsFormattingBar {
                 formattingBand
@@ -107,12 +108,20 @@ struct NotesView: View {
             .frame(height: Theme.Size.noteFooterHeight)
     }
 
+    /// A click switches between characters and words, as Raycast's counter does.
     private var characterCount: some View {
-        Text(notes.characterCountLabel)
-            .font(Theme.Typography.rowTrailing)
-            .foregroundStyle(Theme.Colors.textTertiary)
-            .lineLimit(1)
-            .accessibilityLabel("\(notes.characterCount) characters in this note")
+        Button(action: notes.toggleCountMode) {
+            Text(notes.characterCountLabel)
+                .font(Theme.Typography.rowTrailing)
+                .foregroundStyle(Theme.Colors.textTertiary)
+                .lineLimit(1)
+        }
+        .buttonStyle(.plain)
+        .focusable(false)
+        .accessibilityLabel(
+            notes.local.countsWords
+                ? Text(notes.characterCountLabel) : Text("\(notes.characterCount) characters in this note"))
+        .tooltip(String(localized: "Toggle between character count and word count"))
     }
 }
 

@@ -10,6 +10,8 @@ final class NotesPanel: NSPanel {
     var commandChords: [String: () -> Void] = [:]
     /// The same, for ⌥⌘-letter chords.
     var optionCommandChords: [String: () -> Void] = [:]
+    /// The same, for ⇧⌘ chords, keyed by the shifted character (`+` for ⇧⌘=).
+    var shiftCommandChords: [String: () -> Void] = [:]
     /// False for the heading menu, so the editor keeps its caret, reveal and chords beneath it.
     var acceptsKey = true
     var onMouseDown: (() -> Void)?
@@ -46,6 +48,11 @@ final class NotesPanel: NSPanel {
         let key = event.charactersIgnoringModifiers?.lowercased()
         if modifiers == [.command, .option] {
             guard let key, let chord = optionCommandChords[key] else { return false }
+            chord()
+            return true
+        }
+        if modifiers == [.command, .shift] {
+            guard let key, let chord = shiftCommandChords[key] else { return false }
             chord()
             return true
         }
