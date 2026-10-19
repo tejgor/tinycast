@@ -41,10 +41,11 @@ locally on one Mac. Everything in `AGENTS.md` still applies; this file only adds
     committed, no conflict markers remain, the tree is clean and the build passes. Anything less
     stops with nothing installed, the reason in the notification, and the attempt left in
     `build/update-worktree`. Transcripts are `build/update-claude-*.json`.
-  - A session that can't sign in gets its own message. That happens if the login expires, or once a
-    future Claude Code makes `--bare` the `-p` default, since bare mode never reads the subscription
-    login. How to authenticate then is the user's decision: `/login` again, a long-lived token from
-    `claude setup-token` (`CLAUDE_CODE_OAUTH_TOKEN`), or an API key, which bills at API rates.
+  - A session that can't sign in gets its own message, and how to authenticate is the user's call.
+    An expired login is fixed by `/login` again or a long-lived token from `claude setup-token`.
+    A future Claude Code that makes `--bare` the `-p` default is different: bare mode reads only
+    `ANTHROPIC_API_KEY` or an `apiKeyHelper` from `--settings`, never the subscription login or its
+    tokens, so it would need an API key, which bills at API rates.
   - `TINYCAST_UPDATE_CLAUDE=0` turns all of this off.
 - If you are that session: you are resolving an upstream merge, so the instructions in your prompt
   and the rules in this file and `AGENTS.md` are the whole job. Keep upstream's change and re-apply
