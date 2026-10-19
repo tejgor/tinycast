@@ -29,8 +29,46 @@ if [ -t 1 ]; then exec > >(tee -a "$LOG") 2>&1; else exec >>"$LOG" 2>&1; fi
 trap '' HUP PIPE
 echo "── $(date '+%Y-%m-%d %H:%M:%S') ──"
 
+NOTIFIER="$REPO/build/Tinycast Update.app"
+NOTIFIER_SOURCE="$REPO/Scripts/update-notifier.swift"
+
+# A tiny bundle of our own, because `display notification` always wears Script Editor's icon.
+notifier_ready() {
+    local binary="$NOTIFIER/Contents/MacOS/notify"
+    [ -x "$binary" ] && [ "$binary" -nt "$NOTIFIER_SOURCE" ] && return 0
+    local icon=/Applications/Tinycast.app/Contents/Resources/tinycast.icns
+    [ -f "$icon" ] || [ -f "$NOTIFIER/Contents/Resources/tinycast.icns" ] || return 1
+    mkdir -p "$NOTIFIER/Contents/MacOS" "$NOTIFIER/Contents/Resources"
+    [ -f "$icon" ] && cp "$icon" "$NOTIFIER/Contents/Resources/"
+    cat >"$NOTIFIER/Contents/Info.plist" <<'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key><string>com.tinycast.app.personal.update</string>
+    <key>CFBundleName</key><string>Tinycast Update</string>
+    <key>CFBundleDisplayName</key><string>Tinycast Update</string>
+    <key>CFBundleExecutable</key><string>notify</string>
+    <key>CFBundleIconFile</key><string>tinycast</string>
+    <key>CFBundlePackageType</key><string>APPL</string>
+    <key>CFBundleShortVersionString</key><string>1.0</string>
+    <key>CFBundleVersion</key><string>1</string>
+    <key>LSMinimumSystemVersion</key><string>26.0</string>
+    <key>LSUIElement</key><true/>
+</dict>
+</plist>
+EOF
+    xcrun swiftc -O -swift-version 5 -o "$binary" "$NOTIFIER_SOURCE" >/dev/null 2>&1 || return 1
+    codesign --force --sign "Tinycast Self-Signed" "$NOTIFIER" >/dev/null 2>&1 \
+        || codesign --force --sign - "$NOTIFIER" >/dev/null 2>&1
+    /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister \
+        -f "$NOTIFIER" >/dev/null 2>&1
+    return 0
+}
+
 notify() {
     echo "$1"
+    notifier_ready && "$NOTIFIER/Contents/MacOS/notify" "$1" >/dev/null 2>&1 && return 0
     osascript - "$1" >/dev/null 2>&1 <<'EOF' || true
 on run argv
     display notification (item 1 of argv) with title "Tinycast update"
