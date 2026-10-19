@@ -26,6 +26,8 @@ struct NotesTests {
         testLocalState()
         try await testDuplicateAndTrashAll()
         testHistory()
+        testExport()
+        testDeepLinks()
 
         print(failures == 0 ? "Notes tests passed" : "\(failures) tests failed")
         exit(failures == 0 ? 0 : 1)
@@ -70,6 +72,81 @@ struct NotesTests {
         check("revisiting the current note adds nothing", { var h = NoteHistory(); h.visit(a); h.visit(a); return h.entries.count == 1 }())
     }
 
+    private static func testExport() {
+        let source = """
+            # Plan
+            Some **bold** and a [link](https://a.com?x=1&y=2) <tag>
+            next line
+
+            - one
+                - nested
+            - two
+            3. third
+            - [x] done
+            > quoted
+            ```swift
+            let a = 1 < 2
+            ```
+            | A | B |
+            | :-: | --: |
+            | `c` | d \\| e |
+            ---
+            """
+        let markdown = NoteMarkdownParser.parse(source)
+        let plain = NoteExport.plainText(markdown)
+        check(
+            "plain text drops markers and keeps lists, code and table rows readable",
+            plain == """
+                Plan
+                Some bold and a link <tag>
+                next line
+
+                • one
+                  • nested
+                • two
+                3. third
+                ☑ done
+                quoted
+                let a = 1 < 2
+                A\tB
+                c\td | e
+                ———
+                """)
+        let html = NoteExport.html(markdown)
+        check(
+            "HTML escapes text and attributes and nests inline tags",
+            html.contains("<h1>Plan</h1>")
+                && html.contains("<p>Some <strong>bold</strong> and a <a href=\"https://a.com?x=1&amp;y=2\">link</a> &lt;tag&gt;<br>next line</p>"))
+        check(
+            "HTML nests a list inside its parent item and switches list types",
+            html.contains("<ul>\n<li>one\n<ul>\n<li>nested\n</li></ul>\n</li>\n<li>two\n</li></ul>\n<ol start=\"3\">\n<li>third\n</li></ol>"))
+        check(
+            "HTML writes tasks, quotes, code without a leading blank line, tables and rules",
+            html.contains("<input type=\"checkbox\" disabled checked> done")
+                && html.contains("<blockquote><p>quoted</p></blockquote>")
+                && html.contains("<pre><code class=\"language-swift\">let a = 1 &lt; 2</code></pre>")
+                && html.contains("<th style=\"text-align: center\">A</th><th style=\"text-align: right\">B</th>")
+                && html.contains("<td style=\"text-align: center\"><code>c</code></td><td style=\"text-align: right\">d | e</td>")
+                && html.hasSuffix("<hr>"))
+        check(
+            "Markdown export is the source itself",
+            NoteExport.string(.markdown, source: source, title: "Plan") == source)
+    }
+
+    private static func testDeepLinks() {
+        let id = NoteID(rawValue: "Week / Plan & Notes.md".replacingOccurrences(of: "/", with: "-"))
+        let url = NoteDeepLink.url(for: id)
+        check("a note's deeplink opens that note", url.flatMap(NoteDeepLink.route) == .open(id))
+        check(
+            "the bare notes link shows the window, and other links are not ours",
+            URL(string: "tinycast://notes").flatMap(NoteDeepLink.route) == .show
+                && URL(string: "tinycast://extensions/a/b/c").flatMap(NoteDeepLink.route) == nil
+                && URL(string: "raycast://notes").flatMap(NoteDeepLink.route) == nil)
+        check(
+            "a path-like id never reaches the file system",
+            URL(string: "tinycast://notes/open?id=../x.md").flatMap(NoteDeepLink.route) == .show)
+    }
+
     private static func testLocalState() {
         let suite = "com.tinycast.notes-local-state-test.\(UUID().uuidString)"
         guard let defaults = UserDefaults(suiteName: suite) else { return check("a test suite opens", false) }
@@ -78,6 +155,19 @@ struct NotesTests {
         check("the window auto-sizes until told otherwise", state.autoSizesWindow)
         state.autoSizesWindow = false
         check("turning auto-sizing off survives a relaunch", !NotesLocalState(defaults: defaults).autoSizesWindow)
+        let (a, b) = (NoteID(rawValue: "a.md"), NoteID(rawValue: "b.md"))
+        state.togglePin(a)
+        state.togglePin(b)
+        state.noteOpened(a, at: Date(timeIntervalSince1970: 100))
+        state.noteRenamed(a, to: NoteID(rawValue: "c.md"))
+        let reloaded = NotesLocalState(defaults: defaults)
+        check(
+            "pins keep their order and follow a rename, and both survive a relaunch",
+            reloaded.pinned.map(\.rawValue) == ["c.md", "b.md"]
+                && reloaded.lastOpened[NoteID(rawValue: "c.md")] == Date(timeIntervalSince1970: 100))
+        state.notesRemoved([b])
+        state.togglePin(NoteID(rawValue: "c.md"))
+        check("removing and unpinning clear the pins", state.pinned.isEmpty)
     }
 
     private static func testRepositoryAndSearch() throws {

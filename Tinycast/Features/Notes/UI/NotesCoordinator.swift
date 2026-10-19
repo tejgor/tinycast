@@ -19,6 +19,10 @@ final class NotesCoordinator {
         coordinator: self)
     @ObservationIgnored private lazy var headingMenuController = NoteHeadingMenuWindowController(
         coordinator: self)
+    @ObservationIgnored private lazy var actionsController = NoteActionsWindowController(coordinator: self)
+    private(set) var isActionsPresented = false
+    private(set) var actionsQuery = ""
+    private(set) var actionsSelection: String?
     @ObservationIgnored private var loadTask: Task<Void, Never>?
     @ObservationIgnored private var issueTask: Task<Void, Never>?
     @ObservationIgnored private var operationTask: Task<Void, Never>?
@@ -39,6 +43,10 @@ final class NotesCoordinator {
     @ObservationIgnored var headingButtonFrame: CGRect = .zero
     private var switcherRename = NoteSwitcherRenameState()
     @ObservationIgnored private var history = NoteHistory()
+    @ObservationIgnored private var countCache: [NoteID: (modified: Date, count: Int)] = [:]
+    private(set) var noteCounts: [NoteID: Int] = [:]
+    /// A deeplink that arrived while the window was hidden, opened once the editor shows.
+    @ObservationIgnored private var pendingLinkedNote: NoteID?
     @ObservationIgnored private lazy var menuBarButton = NotesMenuBarButton { [weak self] in self?.toggle() }
     private var presentationGeneration = 0
 
@@ -113,20 +121,25 @@ final class NotesCoordinator {
     }
 
     private func trackMenuBarButton() {
-        withObservationTracking {
-            menuBarButton.setShown(settings.notesEnabled && settings.notesShowsMenuBarButton)
+        let shown = withObservationTracking {
+            settings.notesEnabled && settings.notesShowsMenuBarButton
         } onChange: { [weak self] in
             Task { @MainActor in self?.trackMenuBarButton() }
         }
+        menuBarButton.setShown(shown)
     }
 
     /// Re-armed after every change, so each note the window shows lands in the history once.
     private func trackHistory() {
-        withObservationTracking {
-            if let id = store.activeID { history.visit(id) }
+        // Read inside, act outside: writing the open time while tracking could re-trigger the tracking.
+        let active = withObservationTracking {
+            store.activeID
         } onChange: { [weak self] in
             Task { @MainActor in self?.trackHistory() }
         }
+        guard let active else { return }
+        history.visit(active)
+        local.noteOpened(active, at: Date())
     }
 
     var searchQueryBinding: Binding<String> {
@@ -140,8 +153,224 @@ final class NotesCoordinator {
     var showsFormattingBar: Bool { settings.notesRendersMarkdown && settings.notesShowsFormattingBar }
     var isSearching: Bool { store.isSearching }
     var visibleNotes: [NoteSummary] {
+        guard isBrowsingAll else { return store.searchResults.map(\.summary) }
+        return pinnedNotes + recentNotes
+    }
+
+    var isBrowsingAll: Bool {
         store.searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            ? store.summaries : store.searchResults.map(\.summary)
+    }
+
+    /// In pin order; a pin whose file is gone is skipped rather than shown empty.
+    var pinnedNotes: [NoteSummary] {
+        let byID = Dictionary(store.summaries.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        return local.pinned.compactMap { byID[$0] }
+    }
+
+    /// Most recently opened first; a note never opened here counts from its last edit.
+    var recentNotes: [NoteSummary] {
+        store.summaries.filter { !local.isPinned($0.id) }.sorted { lastSeen($0) > lastSeen($1) }
+    }
+
+    func lastOpened(_ summary: NoteSummary) -> Date? {
+        local.lastOpened[summary.id]
+    }
+
+    private func lastSeen(_ summary: NoteSummary) -> Date {
+        local.lastOpened[summary.id] ?? summary.modifiedAt
+    }
+
+    func isPinned(_ id: NoteID) -> Bool {
+        local.isPinned(id)
+    }
+
+    var isActiveNotePinned: Bool {
+        store.activeID.map(local.isPinned) ?? false
+    }
+
+    func togglePin(_ id: NoteID) {
+        local.togglePin(id)
+    }
+
+    func togglePinActiveNote() {
+        guard let id = store.activeID else { return }
+        local.togglePin(id)
+    }
+
+    func toggleSwitcherSelectionPin() {
+        guard let id = switcherSelection else { return }
+        local.togglePin(id)
+    }
+
+    /// ⌘1–⌘9, counted from one in the order the notes were pinned.
+    func openPinned(_ slot: Int) {
+        let pinned = pinnedNotes
+        guard pinned.indices.contains(slot - 1) else { return }
+        select(pinned[slot - 1].id)
+    }
+
+    // MARK: - Actions
+
+    var actionsQueryBinding: Binding<String> {
+        Binding(
+            get: { [weak self] in self?.actionsQuery ?? "" },
+            set: { [weak self] in
+                self?.actionsQuery = $0
+                self?.actionsSelection = self?.visibleActions.first?.id
+            })
+    }
+
+    func toggleActions() {
+        if isActionsPresented { closeActions() } else { openActions() }
+    }
+
+    func openActions() {
+        guard settings.notesEnabled, windowController.isVisible else { return }
+        closeHeadingMenu()
+        closeSwitcher(focusEditor: false)
+        actionsQuery = ""
+        actionsSelection = visibleActions.first?.id
+        isActionsPresented = true
+        windowController.presentActions(actionsController)
+    }
+
+    func closeActions(focusEditor: Bool = true) {
+        guard isActionsPresented else { return }
+        isActionsPresented = false
+        actionsController.hide()
+        if focusEditor { windowController.focusEditor() }
+    }
+
+    func moveActionsSelection(by offset: Int) {
+        let items = visibleActions
+        guard !items.isEmpty else { return }
+        let index = items.firstIndex { $0.id == actionsSelection } ?? (offset > 0 ? -1 : items.count)
+        actionsSelection = items[(index + offset + items.count) % items.count].id
+    }
+
+    /// ⌘↓ lands on the next group's first row; ⌘↑ on this group's first, then the one before.
+    func moveActionsSection(by offset: Int) {
+        let items = visibleActions
+        guard let index = items.firstIndex(where: { $0.id == actionsSelection }) else { return }
+        let starts = items.indices.filter { $0 == 0 || items[$0].section != items[$0 - 1].section }
+        let current = starts.last { $0 <= index } ?? 0
+        let target =
+            offset > 0
+            ? starts.first { $0 > index }
+            : (index > current ? current : starts.last { $0 < current })
+        if let target { actionsSelection = items[target].id }
+    }
+
+    func performSelectedAction() {
+        guard let item = visibleActions.first(where: { $0.id == actionsSelection }) else { return }
+        perform(item)
+    }
+
+    /// Closes first, so an action that opens a window or sheet finds the note window key.
+    func perform(_ item: NoteActionItem) {
+        closeActions()
+        item.perform()
+    }
+
+    func findInNote() {
+        windowController.showFindBar()
+    }
+
+    func trashActiveNote() {
+        guard let id = store.activeID else { return }
+        trash(id)
+    }
+
+    func openNotesSettings() {
+        core.settingsCoordinator.showSettings(tab: .notes)
+    }
+
+    // MARK: - Deeplinks
+
+    /// True for any notes link, handled or not, so no other handler reads it as its own.
+    func handleDeepLink(_ url: URL) -> Bool {
+        guard let route = NoteDeepLink.route(url) else { return false }
+        guard settings.notesEnabled else { return true }
+        switch route {
+        case .show:
+            if !windowController.isVisible { request(.editor) }
+        case .open(let id):
+            if windowController.isVisible, store.isLoaded {
+                select(id)
+            } else {
+                pendingLinkedNote = id
+                request(.editor)
+            }
+        }
+        return true
+    }
+
+    // MARK: - Copy and export
+
+    func copyActiveNote(as format: NoteExport.Format) {
+        guard hasActiveNote else { return }
+        let text = NoteExport.string(format, source: store.source, title: activeTitle)
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        switch format {
+        case .html:
+            // Rich text where the destination reads HTML; the plain rendering everywhere else.
+            pasteboard.setString(text, forType: .html)
+            pasteboard.setString(NoteExport.string(.plainText, source: store.source, title: activeTitle), forType: .string)
+        case .markdown, .plainText:
+            pasteboard.setString(text, forType: .string)
+        }
+        core.showMessage(String(localized: "Copied"))
+    }
+
+    func copyActiveNoteDeepLink() {
+        guard let id = store.activeID, let url = NoteDeepLink.url(for: id) else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(url.absoluteString, forType: .string)
+        core.showMessage(String(localized: "Copied Deeplink"))
+    }
+
+    func exportActiveNote(as format: NoteExport.Format) {
+        guard hasActiveNote else { return }
+        let text = NoteExport.string(format, source: store.source, title: activeTitle)
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = "\(activeTitle).\(format.fileExtension)"
+        panel.canCreateDirectories = true
+        windowController.presentSavePanel(panel) { [weak self] url in
+            guard let url else { return }
+            do {
+                try Data(text.utf8).write(to: url, options: .atomic)
+            } catch {
+                self?.core.showMessage(String(localized: "Couldn't export the note"), tone: .danger)
+            }
+        }
+    }
+
+    // MARK: - Counts
+
+    /// The live count for the open note; the rest are read off-main and kept until their file changes.
+    func characterCount(of id: NoteID) -> Int? {
+        id == store.activeID ? characterCount : noteCounts[id]
+    }
+
+    func refreshNoteCounts() {
+        let directory = store.notesDirectory
+        let stale = visibleNotes.prefix(200)
+            .filter { countCache[$0.id]?.modified != $0.modifiedAt }
+            .map { ($0.id, $0.modifiedAt) }
+        guard !stale.isEmpty else { return }
+        Task { [weak self] in
+            let counted = await Task.detached(priority: .utility) {
+                stale.compactMap { id, modified -> (NoteID, Date, Int)? in
+                    let url = directory.appendingPathComponent(id.rawValue)
+                    guard let text = try? String(contentsOf: url, encoding: .utf8) else { return nil }
+                    return (id, modified, text.utf16.count)
+                }
+            }.value
+            guard let self else { return }
+            for (id, modified, count) in counted { countCache[id] = (modified, count) }
+            noteCounts = countCache.mapValues(\.count)
+        }
     }
     var switcherEditingID: NoteID? { switcherRename.id }
     var isRenamingSwitcherNote: Bool { switcherRename.isActive }
@@ -217,6 +446,7 @@ final class NotesCoordinator {
     }
 
     func hide() {
+        closeActions(focusEditor: false)
         closeHeadingMenu()
         presentationGeneration &+= 1
         pendingPresentation = nil
@@ -226,7 +456,9 @@ final class NotesCoordinator {
     }
 
     func handleEscape() {
-        if isHeadingMenuPresented {
+        if isActionsPresented {
+            closeActions()
+        } else if isHeadingMenuPresented {
             closeHeadingMenu()
         } else if isSwitcherPresented {
             closeSwitcher()
@@ -315,6 +547,7 @@ final class NotesCoordinator {
             }
             switcherSelection = renamedID
             history.rename(id, to: renamedID)
+            local.noteRenamed(id, to: renamedID)
             if renamedID == store.activeID, permitsCompletion(generation) {
                 windowController.show(focusEditor: false)
             }
@@ -340,7 +573,9 @@ final class NotesCoordinator {
                 symbol: nil,
                 confirmTitle: String(localized: "Move to Trash"))
             guard confirmed, settings.notesEnabled, !Task.isCancelled else { return }
+            let all = Set(store.summaries.map(\.id))
             _ = await store.trashAll()
+            local.notesRemoved(all.subtracting(store.summaries.map(\.id)))
             closeSwitcher(focusEditor: false)
             guard permitsCompletion(generation) else { return }
             windowController.show(focusEditor: false)
@@ -374,6 +609,7 @@ final class NotesCoordinator {
                 if !settings.notesEnabled { store.stop() }
                 return
             }
+            local.notesRemoved([id])
             switcherSelection = NoteSwitcherSelection.replacement(
                 afterRemoving: id,
                 from: switcherOrder,
@@ -521,6 +757,10 @@ final class NotesCoordinator {
         case .editor:
             closeSwitcher()
             windowController.show(focusEditor: true)
+            if let linked = pendingLinkedNote {
+                pendingLinkedNote = nil
+                select(linked)
+            }
         case .create:
             let generation = presentationGeneration
             guard await store.create(), settings.notesEnabled, !Task.isCancelled,

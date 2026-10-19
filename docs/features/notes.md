@@ -152,14 +152,39 @@ in-window screen — a note window may be 180pt tall, and the list must not be. 
 surface as a `PopoverMenu`, and its 240-point height is a ceiling rather than a size: the list reports
 its own height and the window shrinks to it with the top edge pinned. It travels with its host, dismisses
 like a popover when it resigns key, and closes outright when the last note goes. An empty query lists
-metadata by recency; a nonempty query searches titles and literal bodies after a 120-millisecond
-debounce. Results are capped at 200, and generation checks prevent superseded search or selection work
+pinned notes first, in pin order under a **Pinned** header, then the rest under **Notes** by when they
+were last opened here (`NotesLocalState.lastOpened`), or last edited for a note never opened; a nonempty
+query searches titles and literal bodies after a 120-millisecond debounce. Each row reads like Raycast's
+— "Opened 3 hours ago • 633 characters" — where the open note's count is the live one and the rest are
+read off-main by `refreshNoteCounts` and kept per file until its modification date moves. Results are capped at 200, and generation checks prevent superseded search or selection work
 from publishing.
 
 Arrow keys and Return do not intercept an inline rename. Command-Delete moves the selected row to Trash
 only while the switcher is not renaming; in the editor and title field it remains a native text command.
 After confirmation, Trash chooses its successor from the current visible ordering. Each row exposes
-VoiceOver actions to activate, rename, and move the actual note title to Trash.
+VoiceOver actions to activate, rename, pin or unpin, and move the actual note title to Trash.
+
+**Pins** live in `NotesLocalState.pinned`, by filename, so a rename moves a pin and a trash drops it.
+⇧⌘P pins or unpins the open note, or the switcher's selection (⌘. there too); ⌘1–⌘9 open the pinned
+notes in pin order. Raycast puts its first pin on ⌘0, which here stays actual-size zoom.
+
+**⌘K opens the action panel**, `NoteActionsWindowController`: a key child window over the note's
+bottom-trailing corner with its search field at the bottom, built like the switcher rather than on
+`PopoverMenu`, which depends on palette state. `NoteActionItem`s come from the coordinator's state —
+New Note, Browse Notes, Go Back and Forward; Pin, Duplicate, Copy Note as Markdown, HTML or Plain Text,
+Copy Deeplink and Export as each; Find, the format buttons, window auto-sizing, zoom, the notes folder
+and Settings; then Delete Note and Delete All Notes. Typing filters by every word of the title, ↑ and ↓
+move, ⌘↑ and ⌘↓ jump between groups, Return runs the row and Escape or ⌘K closes. A row closes the panel
+before it runs, so a sheet it opens finds the note window key.
+
+`NoteExport` renders the open note: Markdown is the source; plain text drops markers, keeps list
+bullets, numbers and checkboxes as `•`, `1.`, `☐`/`☑`, and writes table rows tab-separated; HTML groups
+consecutive lines into one block, as the editor draws them, nests lists properly, escapes everything and
+renders table alignment. Copy as HTML puts both HTML and the plain rendering on the pasteboard. Export
+writes through an `NSSavePanel` sheet on the note window, since a free-standing modal would open
+beneath the floating panel. `tinycast://notes/open?id=<filename>` (`NoteDeepLink`) opens a note — after
+showing the window first if it was hidden — and `tinycast://notes` shows the window; `AppCore` offers
+every URL to the notes coordinator before the extension links.
 
 ## Editor
 

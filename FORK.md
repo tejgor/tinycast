@@ -75,6 +75,9 @@ locally on one Mac. Everything in `AGENTS.md` still applies; this file only adds
   - ⌘L link, ⇧⌘S strikethrough, ⌘↵ checkbox, ⌘[ / ⌘] history (`NoteHistory`), ⌘+ / ⌘− / ⌘0 zoom,
     a character/word count toggle, Duplicate Note, Delete All Notes;
   - Settings → Notes → Escape Key Loses Focus and Show Notes Button in Menu Bar (fork-only, not in backups).
+  - pins (⇧⌘P, ⌘1–⌘9), a browser with Pinned/Notes sections and "Opened … • N characters" rows, and a
+    ⌘K action panel (`NoteActionsWindowController`) with copy/export as Markdown, HTML or plain text
+    (`NoteExport`), deeplinks (`NoteDeepLink`, `tinycast://notes/open?id=…`), duplicate and delete all.
   - Device-local Notes state lives in `NotesLocalState` (one `AppCore` line), not in `AppSettings`.
 - Settings → General → Transparency thins the launcher's scrim over its glass
   (`AppSettings.paletteTransparency`, `appearance.transparency` in `settings.json`; not in backups).

@@ -475,6 +475,7 @@ final class AppCore {
     }
 
     func handleOpenURL(_ url: URL) {
+        if notesCoordinator.handleDeepLink(url) { return }
         guard ExtensionDeepLink.claims(url) else { return }
         guard let route = ExtensionDeepLink.route(url: url) else {
             paletteCoordinator.showPalette(mode: .launcher, restoreAnyMode: true)

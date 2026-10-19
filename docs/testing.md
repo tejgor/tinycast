@@ -646,6 +646,11 @@ caches, TCC grants and login item, so this cannot disturb an installed copy.
 - Clicking the footer count switches between characters and words, and the choice survives a relaunch
 - With Escape Key Loses Focus on, Escape returns to the previous app and the note stays on screen
 - Show Notes Button in Menu Bar adds a menu bar item that shows and hides the window
+- ⇧⌘P pins the open note; the browser shows it under Pinned, ⌘1 opens it, and a rename keeps the pin
+- Browser rows read "Opened … • N characters", most recently opened first
+- ⌘K opens the action panel over the bottom-right corner: typing filters, ⌘↑/⌘↓ jump groups, Return runs,
+  Escape and ⌘K close; Copy Note as HTML pastes formatted into Mail, Export writes a file through a sheet
+- Copy Deeplink, then opening it from Terminal (`open 'tinycast://…'`) shows that note, even when hidden
 - Inside a code block both fences show and Markdown inside it stays literal
 - A table renders as a grid in Dark and Light: filled header, rounded corners, one hairline at every
   seam, `:--` / `:-:` / `--:` alignment, and bold, links and code inside cells; narrowing the window

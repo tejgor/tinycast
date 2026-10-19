@@ -44,6 +44,16 @@ final class NotesWindowController: NSObject, NSWindowDelegate {
         }
     }
 
+    /// A sheet on the note window: a free-standing modal would open beneath the floating panel.
+    func presentSavePanel(_ savePanel: NSSavePanel, completion: @escaping (URL?) -> Void) {
+        guard let panel, panel.isVisible else { return completion(nil) }
+        // An accessory app's sheet opens behind the frontmost app without this.
+        NSApp.activate(ignoringOtherApps: true)
+        savePanel.beginSheetModal(for: panel) { response in
+            completion(response == .OK ? savePanel.url : nil)
+        }
+    }
+
     /// The note stays on screen; the keyboard goes back to whatever had it before the window.
     func releaseFocus() {
         guard let panel, panel.isVisible, panel.isKeyWindow else { return }
@@ -92,7 +102,16 @@ final class NotesWindowController: NSObject, NSWindowDelegate {
         menu.show(above: panel)
     }
 
-    /// Only this controller knows the host window, so handing it over stays its job.
+    func presentActions(_ actions: NoteActionsWindowController) {
+        guard let panel, panel.isVisible else { return }
+        actions.show(over: panel)
+    }
+
+    func showFindBar() {
+        editor?.find(.showFindInterface)
+    }
+
+        /// Only this controller knows the host window, so handing it over stays its job.
     func presentSwitcher(_ switcher: NoteSwitcherWindowController) {
         guard let panel, panel.isVisible else { return }
         switcher.show(under: panel)
@@ -226,10 +245,15 @@ final class NotesWindowController: NSObject, NSWindowDelegate {
             "]": { [weak coordinator] in coordinator?.goForward() },
             "=": { [weak coordinator] in coordinator?.zoomIn() },
             "-": { [weak coordinator] in coordinator?.zoomOut() },
-            "0": { [weak coordinator] in coordinator?.resetZoom() }
+            "0": { [weak coordinator] in coordinator?.resetZoom() },
+            "k": { [weak coordinator] in coordinator?.toggleActions() }
         ]
+        for slot in 1...9 {
+            panel.commandChords[String(slot)] = { [weak coordinator] in coordinator?.openPinned(slot) }
+        }
         panel.shiftCommandChords = [
-            "+": { [weak coordinator] in coordinator?.zoomIn() }
+            "+": { [weak coordinator] in coordinator?.zoomIn() },
+            "p": { [weak coordinator] in coordinator?.togglePinActiveNote() }
         ]
         panel.optionCommandChords = [
             "t": { [weak coordinator] in coordinator?.toggleFormattingBar() }
