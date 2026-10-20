@@ -250,7 +250,10 @@ ask_claude() {
     local verdict
     verdict="$(classify_transcript "$transcript")"
     case "$verdict" in
-        resolved) return 0 ;;
+        resolved)
+            notify "Claude Code finished the ${label}. Checking its work, then building and installing…"
+            return 0
+            ;;
         sign-in:*) CLAUDE_FAILURE="Claude Code couldn't sign in (${verdict#sign-in: })"; return 2 ;;
         *) CLAUDE_FAILURE="${verdict#failed: }"; return 1 ;;
     esac
