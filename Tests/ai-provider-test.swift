@@ -1834,6 +1834,28 @@ struct AIProviderTests {
                 && claudeFrame.completed,
             "Claude result usage ends the stream")
 
+        let claudeWebUse = Data(
+            (#"{"type":"assistant","message":{"content":["#
+                + #"{"type":"tool_use","id":"s1","name":"WebSearch","input":{"query":"swift 6"}},"#
+                + #"{"type":"tool_use","id":"f1","name":"WebFetch","input":{"url":"https://swift.org/blog"}}]}}"#)
+                .utf8)
+        let webFrame = InstalledAIStreamDecoder.decode(claudeWebUse, kind: .claude, webTools: true)
+        expect(
+            webFrame.events == [
+                .searching("swift 6"), .toolCall(id: "f1", origin: "swift.org", title: "WebFetch")
+            ] && webFrame.webSearchIDs == ["s1"],
+            "a searching Claude turn shows WebSearch as a search and WebFetch as a call to the page's host")
+        expect(
+            InstalledAIStreamDecoder.decode(claudeWebUse, kind: .claude).events.isEmpty
+                && AIModelCapabilities.claudeCommand.webSearch,
+            "without Web Search the same calls show nothing, and the route still offers search")
+        let claudeWebResult = Data(
+            #"{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"s1"}]}}"#.utf8)
+        expect(
+            InstalledAIStreamDecoder.decode(claudeWebResult, kind: .claude, webTools: true).events
+                == [.toolResult(id: "s1", isError: false)],
+            "a web tool's result reaches the runner, which finishes the search it belongs to")
+
         let cursorDelta = Data(
             #"{"type":"assistant","timestamp_ms":1,"message":{"content":[{"type":"text","text":"Hi"}]}}"#
                 .utf8)

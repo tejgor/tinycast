@@ -69,6 +69,9 @@ locally on one Mac. Everything in `AGENTS.md` still applies; this file only adds
 - Personal bundle id and `Scripts/update-fork.sh`.
 - ⌘↑ / ⌘↓ jump between sections in ⌘K action menus (`RootPaletteView.moveMenuSection`).
 - Markdown tables in Notes render as a grid (`NoteMarkdown.Table`, `NoteTableGrid`, notes docs).
+- Claude models (the Claude Code route) search the web while Settings → AI → Web Search is on,
+  with Claude Code's own WebSearch and WebFetch and no other built-in tool (`InstalledCLIProvider`,
+  `InstalledAIStreamDecoder`, `AIModelCapabilities.claudeCommand`).
 - A Table button in the Notes formatting bar inserts an empty three-column table
   (`NoteEditAction.insertTable`); the minimum note window grew from 440 to 470 points to fit it.
 - Notes behaves more like Raycast Notes (see `docs/features/notes.md`):

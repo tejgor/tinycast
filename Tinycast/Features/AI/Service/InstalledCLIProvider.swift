@@ -33,6 +33,23 @@ private final class InstalledCLITurnRunner {
         commands, read files, inspect the environment, access external resources, or modify \
         anything except through them.
         """
+    /// A searching Claude turn, which `--tools` limits to the two web tools named here.
+    private static let webSafetyInstructions = """
+        You are generating text inside Tinycast. The only tools you may use are WebSearch and \
+        WebFetch, to find and read pages on the web. Do not run commands, read files, inspect the \
+        environment, or modify anything.
+        """
+    private static let toolWebSafetyInstructions = """
+        You are generating text inside Tinycast. The only tools you may use are the MCP tools \
+        supplied with this request, which you may use for anything they offer, and WebSearch and \
+        WebFetch, to find and read pages on the web. Do not run commands, read files, inspect the \
+        environment, or modify anything except through them.
+        """
+    private static let webTools = [
+        InstalledAIStreamDecoder.webSearchTool, InstalledAIStreamDecoder.webFetchTool
+    ].joined(separator: ",")
+    /// A search, a fetch or two and the answer; a turn with MCP servers takes their cap instead.
+    private static let webRounds = 10
 
     private static var maximumPartialLineBytes: Int {
         if let raw = ProcessInfo.processInfo.environment["TC_INSTALLED_MAX_LINE_BYTES"],
@@ -64,6 +81,10 @@ private final class InstalledCLITurnRunner {
     private var activeExecutable: URL?
     /// What this turn armed, empty on every route and every turn that offers no server.
     private var activeServers: [AIToolServer] = []
+    /// Only a Claude turn with Web Search on gets WebSearch and WebFetch.
+    private var searchesWeb = false
+    /// A search finishes on its call's `tool_result`, which names only the call's id.
+    private var openSearchIDs: Set<String> = []
     private var exitStatus: Int32?
     private var outputClosed = false
     private var input: FileHandle?
@@ -158,6 +179,8 @@ private final class InstalledCLITurnRunner {
         }
 
         activeServers = await resolvedToolServers()
+        searchesWeb = kind == .claude && request.webSearch
+        openSearchIDs = []
         let prompt = prompt(for: request)
         let images = request.messages.last { $0.role == .user }?.images ?? []
         var files: [URL] = []
@@ -278,7 +301,7 @@ private final class InstalledCLITurnRunner {
             return
         }
         // A tool loop answers on the same pipe, so an armed turn keeps stdin open for it.
-        write(line, closing: activeServers.isEmpty)
+        write(line, closing: activeServers.isEmpty && !searchesWeb)
     }
 
     /// A pipe write past the buffer blocks until the child drains it, so never on the main actor.
@@ -336,7 +359,19 @@ private final class InstalledCLITurnRunner {
     }
 
     /// Nothing to call is one request; an armed turn takes the reader's cap, which may be none.
-    private var roundCap: Int? { activeServers.isEmpty ? 1 : toolServers?.rounds }
+    private var roundCap: Int? {
+        activeServers.isEmpty ? (searchesWeb ? Self.webRounds : 1) : toolServers?.rounds
+    }
+
+    /// The safety boundary for what this turn may call, plus how to search when it may.
+    private var turnInstructions: String {
+        switch (activeServers.isEmpty, searchesWeb) {
+        case (true, false): Self.safetyInstructions
+        case (false, false): Self.toolSafetyInstructions
+        case (true, true): Self.webSafetyInstructions + " " + CodexTurnRunner.webSearchInstructions
+        case (false, true): Self.toolWebSafetyInstructions + " " + CodexTurnRunner.webSearchInstructions
+        }
+    }
 
     private func arguments(promptFile: URL?, mcpConfig: URL?, attachments: [URL]) -> [String] {
         switch kind {
@@ -352,16 +387,21 @@ private final class InstalledCLITurnRunner {
                 "--include-partial-messages",
                 "--no-session-persistence",
                 "--disable-slash-commands",
-                "--tools", "",
+                "--tools", searchesWeb ? Self.webTools : "",
                 // `--bare` is not among these: it refuses the OAuth sign-in this whole route reuses.
                 "--no-chrome",
-                "--system-prompt",
-                mcpConfig == nil ? Self.safetyInstructions : Self.toolSafetyInstructions
+                "--system-prompt", turnInstructions
             ]
+            // Pre-approved, so neither the reader's ask rules nor a missing prompt pipe stalls one.
+            if searchesWeb { result += ["--allowedTools", Self.webTools] }
             if let mcpConfig {
                 result += ClaudeMCPLaunch.arguments(
                     configurationPath: mcpConfig.path, handles: activeServers.map(\.handle),
                     rounds: roundCap)
+            } else if searchesWeb {
+                // `--disallowedTools *` would take the web tools with it.
+                result += ["--max-turns", "\(Self.webRounds)"]
+                result += InstalledAIManager.claudeWithoutMCPArguments
             } else {
                 // A route with nothing to call keeps every tool off and the turn to one request.
                 result += ["--disallowedTools", "*", "--max-turns", "1"]
@@ -425,9 +465,7 @@ private final class InstalledCLITurnRunner {
     }
 
     private func prompt(for request: AIRequest) -> String {
-        var sections = [
-            activeServers.isEmpty ? Self.safetyInstructions : Self.toolSafetyInstructions
-        ]
+        var sections = [turnInstructions]
         if let instructions = request.instructions?.trimmingCharacters(in: .whitespacesAndNewlines),
             !instructions.isEmpty
         {
@@ -461,7 +499,8 @@ private final class InstalledCLITurnRunner {
             guard !line.isEmpty else { continue }
             apply(
                 InstalledAIStreamDecoder.decode(
-                    Data(line), kind: kind, servers: activeServers), token: token)
+                    Data(line), kind: kind, servers: activeServers, webTools: searchesWeb),
+                token: token)
         }
         if outputBuffer.count > Self.maximumPartialLineBytes {
             fail(String(localized: "\(kind.title) returned an oversized response."))
@@ -481,7 +520,14 @@ private final class InstalledCLITurnRunner {
             }
             return
         }
-        for event in frame.events { continuation?.yield(event) }
+        openSearchIDs.formUnion(frame.webSearchIDs)
+        for event in frame.events {
+            if case .toolResult(let id, _) = event, openSearchIDs.remove(id) != nil {
+                continuation?.yield(.searched(nil))
+            } else {
+                continuation?.yield(event)
+            }
+        }
         if frame.stoppedAtRoundCap {
             fail(
                 roundCap.map { String(localized: "Stopped after \($0) rounds of tool calls.") }

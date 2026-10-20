@@ -12,7 +12,7 @@ final class CodexTurnRunner {
         this request for anything they offer. Never execute commands, read local files, inspect the \
         environment, or modify files except through them.
         """
-    private static let webSearchInstructions = """
+    static let webSearchInstructions = """
         You may use web search when the answer depends on current or external information. For a \
         follow-up, use the sources already in this conversation and search again when more detail \
         or verification is needed. Find the source yourself rather than asking the user for a link \

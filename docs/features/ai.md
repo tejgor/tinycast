@@ -201,6 +201,15 @@ bottom with the model picker. ⌘J hands a Quick AI conversation to the window.
   the round cap instead of the constant 1, or is left out on Unlimited, and
   `--permission-mode default` with an ask rule per server keeps the reader's own allow rules and
   default mode from answering before Tinycast does.
+  With Web Search on, a Claude turn, armed or not, gets exactly WebSearch and WebFetch: `--tools`
+  names those two, `--allowedTools` pre-approves them so neither the reader's ask rules nor a
+  closed prompt pipe stalls a call, and the safety instruction names them as the only built-ins
+  it may use, followed by Codex's web-search instructions. A turn with no server keeps stdin open
+  and takes a cap of 10 rounds rather than 1. A search shows as a search row and a fetch as a tool
+  call titled by the page's host; a search's `tool_result` names only its call id, so the runner
+  keeps the open search ids and turns that result into the search's completion. Anything a fetched
+  page says reaches the model, so a page can try to steer it; with only these two tools the worst
+  it can do is fetch a URL carrying what the conversation holds.
   Grok runs with `--deny *`,
   `dontAsk` permissions and a workspace sandbox, and never `--always-approve`, so a user's always-approve
   config cannot arm tools for this route. OpenCode 2 runs `--standalone`, so its private server
@@ -217,7 +226,7 @@ bottom with the model picker. ⌘J hands a Quick AI conversation to the window.
   the `tinycast` agent's deny-all rule for OpenCode and withheld MCP approval for Cursor. Cursor's is the only one resting
   on an approval prompt rather than an explicit deny, which is why its Providers row says so and the
   others do not. That is also why none of the three may be handed a server: there is no way to offer
-  one without offering the reader's own. None of these routes offer web search, and only Claude and
+  one without offering the reader's own. Of these routes only Claude offers web search (below), and only Claude and
   OpenCode take images: every Claude turn is one `--input-format stream-json` user message, the newest
   question's pictures as base64 `image` blocks beside the framed prompt. OpenCode gets the same
   pictures as private `0600` files in the workspace, one `--file` each, and only for a model whose
@@ -810,7 +819,7 @@ transport code at all.
 | --- | --- | --- | --- | --- |
 | Apple Intelligence | never — it reaches nothing | never — the model is text-only | never | never |
 | Codex | thread-scoped `web_search` config | `image` input part | never — the app-server takes no document part | Tinycast's servers, added as launch overrides; the reader's own are disabled by name |
-| Claude command | never | base64 `image` block in its stream-json user message | never | Tinycast's servers, through `--strict-mcp-config` and a private config file — an empty one when there are none, and neither flag under a managed MCP policy |
+| Claude command | its own WebSearch and WebFetch while Web Search is on — `--tools` names only those two and `--allowedTools` pre-approves them | base64 `image` block in its stream-json user message | never | Tinycast's servers, through `--strict-mcp-config` and a private config file — an empty one when there are none, and neither flag under a managed MCP policy |
 | Grok command | never | never | never | the global config still loads — `--deny *` refuses the call |
 | OpenCode command | never | a private file per picture, through `--file`, only for models whose catalog lists `image` input | never | the global config still loads — the `tinycast` agent's deny-all rule drops every tool |
 | Cursor command | never | never | never | the global config still loads — ask mode and withheld approval refuse the call |
@@ -969,7 +978,7 @@ preamble is the part that is billed on every turn for every user and has no othe
 disables the editor rather than hiding it, so what is being withheld stays readable. One thing it
 deliberately cannot reach: every installed CLI route prepends its own instruction never to run
 commands or touch files, and never to invoke a tool beyond the MCP tools an armed Codex or Claude
-turn supplies. That is a sandbox boundary on a local CLI, not Tinycast describing itself, and a user
+turn supplies, or the WebSearch and WebFetch a searching Claude turn has. That is a sandbox boundary on a local CLI, not Tinycast describing itself, and a user
 switch must not be able to lift it. An armed turn's instruction lets those MCP tools do anything they
 offer, commands and files included: the CLI's own tools are already off by flag and every call
 passes consent, so forbidding it there would only make the model refuse a server the user chose.

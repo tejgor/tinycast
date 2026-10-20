@@ -10,18 +10,21 @@ struct InstalledAIStreamFrame: Equatable, Sendable {
     var unsupportedRequestID: String?
     /// The round cap ended the turn. Only the runner knows the number to say it with.
     var stoppedAtRoundCap = false
+    /// A search's result is a plain `tool_result`, so the runner remembers which calls searched.
+    var webSearchIDs: [String] = []
 }
 
 enum InstalledAIStreamDecoder {
+    /// `webTools` is a Claude turn launched with its own WebSearch and WebFetch.
     static func decode(
-        _ data: Data, kind: InstalledAIKind, servers: [AIToolServer] = []
+        _ data: Data, kind: InstalledAIKind, servers: [AIToolServer] = [], webTools: Bool = false
     ) -> InstalledAIStreamFrame {
         guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
             let type = object["type"] as? String
         else { return InstalledAIStreamFrame() }
         switch kind {
         case .openCode: return openCode(object, type: type)
-        case .claude: return claude(object, type: type, servers: servers)
+        case .claude: return claude(object, type: type, servers: servers, webTools: webTools)
         case .cursor: return cursor(object, type: type)
         case .grok: return grok(object, type: type)
         case .codex: return InstalledAIStreamFrame()
@@ -73,16 +76,18 @@ enum InstalledAIStreamDecoder {
     }
 
     private static func claude(
-        _ object: [String: Any], type: String, servers: [AIToolServer]
+        _ object: [String: Any], type: String, servers: [AIToolServer], webTools: Bool = false
     ) -> InstalledAIStreamFrame {
         var frame = InstalledAIStreamFrame()
-        if !servers.isEmpty, type == "control_request" {
+        let usesTools = !servers.isEmpty || webTools
+        if usesTools, type == "control_request" {
             frame.controlRequest = ClaudeControlProtocol.request(object)
             frame.unsupportedRequestID = ClaudeControlProtocol.unsupportedRequestID(object)
             return frame
         }
-        if !servers.isEmpty, type == "assistant" || type == "user" {
-            frame.events = toolEvents(in: object, servers: servers)
+        if usesTools, type == "assistant" || type == "user" {
+            frame.events = toolEvents(in: object, servers: servers, webTools: webTools)
+            if webTools { frame.webSearchIDs = webSearchIDs(in: object) }
             return frame
         }
         // Summaries arrive as several thinking blocks; a break keeps them from running together.
@@ -130,7 +135,7 @@ enum InstalledAIStreamDecoder {
 
     /// `tool_use` and `tool_result` blocks, as the two events a transcript row is built from.
     private static func toolEvents(
-        in object: [String: Any], servers: [AIToolServer]
+        in object: [String: Any], servers: [AIToolServer], webTools: Bool = false
     ) -> [AIStreamEvent] {
         guard let message = object["message"] as? [String: Any],
             let content = message["content"] as? [[String: Any]]
@@ -138,9 +143,14 @@ enum InstalledAIStreamDecoder {
         return content.compactMap { block in
             switch block["type"] as? String {
             case "tool_use":
-                guard let id = block["id"] as? String, let name = block["name"] as? String,
-                    let call = ClaudeMCPLaunch.route(name)
-                else { return nil }
+                guard let id = block["id"] as? String, let name = block["name"] as? String else { return nil }
+                let input = block["input"] as? [String: Any]
+                if webTools, name == webSearchTool { return .searching(input?["query"] as? String) }
+                if webTools, name == webFetchTool {
+                    let host = (input?["url"] as? String).flatMap { URL(string: $0)?.host() }
+                    return .toolCall(id: id, origin: host ?? name, title: name)
+                }
+                guard let call = ClaudeMCPLaunch.route(name) else { return nil }
                 return .toolCall(
                     id: id, origin: AIToolServerRow.title(of: call.handle, in: servers),
                     title: AIToolServerRow.label(call.tool))
@@ -150,6 +160,17 @@ enum InstalledAIStreamDecoder {
             default:
                 return nil
             }
+        }
+    }
+
+    static let webSearchTool = "WebSearch"
+    static let webFetchTool = "WebFetch"
+
+    private static func webSearchIDs(in object: [String: Any]) -> [String] {
+        let content = (object["message"] as? [String: Any])?["content"] as? [[String: Any]] ?? []
+        return content.compactMap { block in
+            block["type"] as? String == "tool_use" && block["name"] as? String == webSearchTool
+                ? block["id"] as? String : nil
         }
     }
 
