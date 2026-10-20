@@ -65,6 +65,8 @@ enum CalcEngine {
             return CalcDateTime.namedMoment(query, now: now, calendar: calendar).map(unchained)
         }
 
+        if let phrase = CalcDatePhrases.evaluate(query, now: now, calendar: calendar) { return phrase }
+
         if let dateTime = CalcDateTime.evaluate(query, now: now, calendar: calendar) {
             return unchained(dateTime)
         }

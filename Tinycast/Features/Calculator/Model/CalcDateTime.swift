@@ -942,3 +942,44 @@ enum CalcDateTime {
         "saturday": 7, "sat": 7
     ]
 }
+
+/// Fork: what `CalcDatePhrases` needs from the grammar, so upstream's internals stay private.
+extension CalcDateTime {
+    struct ResolvedMoment {
+        let date: Date
+        let hasTime: Bool
+    }
+
+    /// `past` nil reads a yearless date or bare clock as the nearest one.
+    static func resolveMoment(
+        _ phrase: String, past: Bool?, now: Date, calendar: Calendar
+    ) -> ResolvedMoment? {
+        let bias: MomentBias = past.map { $0 ? .past : .future } ?? .nearest
+        return parseMoment(phrase, now: now, calendar: calendar, bias: bias)
+            .map { ResolvedMoment(date: $0.date, hasTime: $0.hasTime) }
+    }
+
+    static func isDuration(_ phrase: String) -> Bool { parseDurations(phrase) != nil }
+
+    static func isWorkdayUnit(_ word: String) -> Bool { businessDayPhrases.contains(word) }
+
+    static func month(named name: String) -> Int? { monthByName[name] }
+
+    static func weekday(named name: String) -> Int? { weekdayByName[name] }
+
+    static func answerText(_ date: Date, hasTime: Bool, now: Date, calendar: Calendar) -> String {
+        answerString(date, hasTime: hasTime, now: now, calendar: calendar)
+    }
+
+    static func badgeText(_ date: Date, hasTime: Bool, now: Date, calendar: Calendar) -> String {
+        momentString(date, hasTime: hasTime, now: now, calendar: calendar)
+    }
+
+    static func clockText(_ date: Date, calendar: Calendar) -> String { timeString(date, calendar: calendar) }
+
+    static func formatted(_ date: Date, calendar: Calendar, pattern: String) -> String {
+        format(date, calendar: calendar, pattern: pattern)
+    }
+
+    static func isWeekendDay(_ date: Date, calendar: Calendar) -> Bool { isWeekend(date, calendar: calendar) }
+}

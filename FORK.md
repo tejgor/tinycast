@@ -79,6 +79,11 @@ locally on one Mac. Everything in `AGENTS.md` still applies; this file only adds
     ⌘K action panel (`NoteActionsWindowController`) with copy/export as Markdown, HTML or plain text
     (`NoteExport`), deeplinks (`NoteDeepLink`, `tinycast://notes/open?id=…`), duplicate and delete all.
   - Device-local Notes state lives in `NotesLocalState` (one `AppCore` line), not in `AppSettings`.
+- Calculator date phrases Raycast answers (`CalcDatePhrases`, see `docs/features/calculator.md`):
+  holidays, `time until`, workday counts, spans like `3 march to 30 may`, `what day is`, week numbers,
+  `days in`, `in 45 days`, `2h 30m`. Tested by `Tests/calc-phrases-test.swift`.
+- Pinned Calculator History entries that are answered live (`CalculatorPinStore`, `CalculatorPinning`,
+  ⌘. on a card or entry). Pins live in `calculator-pins.json` and are not in backups.
 - Settings → General → Transparency thins the scrim over the launcher's and the note window's glass
   (`AppSettings.paletteTransparency`, `appearance.transparency` in `settings.json`; not in backups).
 

@@ -208,8 +208,18 @@ is always written out in full: `1 IDR to USD` is `0.00005539 USD`, never `5.539e
 | From or before a moment   | `3 days from next monday at 7:30`, `2 weeks ago` |
 | A weekday in a later week | `monday in 3 weeks`, `friday in 2 weeks`         |
 | A named moment            | `tomorrow at 9am`, `next monday`, `aug 25`       |
+| In a while                | `in 45 days`, `in 30 min`, `tomorrow 3pm`        |
+| Before or after a date    | `3 weeks after march 14`, `28 days before dec 25` |
+| Time left or gone         | `time until 5pm`, `how long since jan 1`         |
+| A span between two        | `3 march to 30 may`, `days between jan 1 and mar 15`, `7:30am to 8:45pm`, `1978 to 2021` |
+| A weekday                 | `what day is 4 july 2027`, `this friday`         |
+| Calendar facts            | `week number`, `days in february 2028`, `days left in the year` |
 
 **When the answer is a date, Tinycast also shows the day of the week.**
+
+A span between two dates reads like `2 months 3 weeks 6 days`; add `in days`, `in weeks` or
+`in workdays` for one unit. `through` counts the last day too. Week numbers are ISO 8601 weeks.
+Minutes can be written `m` beside hours or seconds, as in `3:45pm + 2h 30m`.
 
 `till` looks forward and `since` looks back. A date without a year uses the **nearest** year, so a
 date three days in the past means three days ago, not next year.
@@ -227,7 +237,17 @@ with slashes are month first. Two-digit years from 00 to 68 mean the 2000s, and 
 ### Workdays
 
 `weekdays`, `business days`, `work days` and `working days` skip Saturdays and Sundays, as in
-`today + 5 business days` or `5 weekdays from now`. Public holidays aren't skipped.
+`today + 5 business days` or `5 weekdays from now`. They count too: `business days until dec 25`,
+`workdays between 1 jan and 31 mar`. Public holidays aren't skipped.
+
+### Holidays
+
+Holidays work anywhere a date does: `days until christmas`, `easter 2027`, `what day is
+thanksgiving`. Tinycast knows Christmas Eve, Christmas, Boxing Day, New Year's Eve and Day,
+Valentine's Day, St Patrick's Day, April Fools' Day, Independence Day, Halloween, Easter, Good
+Friday, Easter Monday, US Thanksgiving, Chinese New Year, Ramadan, Eid al-Fitr, Eid al-Adha, Rosh
+Hashanah, Yom Kippur, Hanukkah and Passover. A holiday's name on its own stays a search; add a year
+or a question. Without a year, `since` means the last one and anything else the next one.
 
 As a unit on its own, a `workday` is eight hours: `55h in workdays`.
 
@@ -308,8 +328,14 @@ an empty search.
 | Copy Answer                                    | <kbd>return</kbd>                    |
 | Copy Expression, on a past entry               | <kbd>⌘</kbd><kbd>return</kbd>        |
 | Put Answer in Search Bar, on a new calculation | <kbd>⌘</kbd><kbd>return</kbd>        |
+| Pin Entry or Unpin Entry                       | <kbd>⌘</kbd><kbd>.</kbd>             |
 | Delete Entry                                   | <kbd>⌃</kbd><kbd>X</kbd>             |
 | Delete All Entries                             | <kbd>⌃</kbd><kbd>⇧</kbd><kbd>X</kbd> |
+
+Pinned calculations stay at the top and are worked out again each time you look, so a countdown
+like `days until christmas` or a rate like `100 usd to eur` stays current. Pin one from its card,
+in the launcher or here, with <kbd>⌘</kbd><kbd>.</kbd> or <kbd>⌘</kbd><kbd>K</kbd>. A past entry
+can be pinned when its expression still gives the same kind of answer.
 
 ## Colors
 

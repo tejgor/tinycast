@@ -48,6 +48,7 @@ final class AppCore {
     let aliases = AliasStore()
     let fallbacks = FallbackStore()
     let calcHistory = CalculatorHistoryStore()
+    let calcPins = CalculatorPinStore()
     let currencyRates = CurrencyRateStore()
     let regionNumberFormat = RegionNumberFormatMonitor()
     let calendarStore = CalendarStore()

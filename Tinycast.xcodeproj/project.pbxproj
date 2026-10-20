@@ -701,6 +701,7 @@
 		D07983DDEA61E5F2B8681F01 /* QuicklinkCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83CD7B0E866AEF486F9EC5E9 /* QuicklinkCoordinator.swift */; };
 		D07F272D0E095B6000D53716 /* NotesCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F5AFB680B55BBAFF2207F99 /* NotesCoordinator.swift */; };
 		D0964B628AFA1B6E754F064C /* CustomCommandArgumentsAccessory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37602A3CBE03EB41BF09622A /* CustomCommandArgumentsAccessory.swift */; };
+		D0D7E173F2277741921698E4 /* CalcDatePhrases.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9290E7ED10FEFC38C911E2F9 /* CalcDatePhrases.swift */; };
 		D16080B73800FF88758E08B3 /* NoteHeadingMenuWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67C489BF8A42B4E0E7FFAA8F /* NoteHeadingMenuWindowController.swift */; };
 		D19969C92342E025A16443B5 /* CalcTokenizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE1C64977153EF104F583008 /* CalcTokenizer.swift */; };
 		D1F02A377FF12C14CE73B1CB /* ExtensionSearchState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5C67CBB0BD596D3E74326D2 /* ExtensionSearchState.swift */; };
@@ -744,6 +745,7 @@
 		E078243555477EA5F02C9119 /* MenuSearchTarget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DFF1EF5B5DA85F78C040BD1 /* MenuSearchTarget.swift */; };
 		E0C0746AD3C7E2FED3C50374 /* WindowActionMemory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A1E7B96668721F12170CD72 /* WindowActionMemory.swift */; };
 		E0C75F1DD4F879772C04F8CA /* WindowLayoutNumberField.swift in Sources */ = {isa = PBXBuildFile; fileRef = D245764DB29BFEEB47A024A1 /* WindowLayoutNumberField.swift */; };
+		E1A0C398524910DC4EDAC657 /* CalculatorPinning.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93CFB02BA7CD3A0F5E101099 /* CalculatorPinning.swift */; };
 		E1A4472391E5AD3EE828202E /* RedactedText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BEA1E122A8139A21E646FE2 /* RedactedText.swift */; };
 		E268D74F0DEFFA598E2D02AA /* OnboardingCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE6972F177922B1EB8831735 /* OnboardingCard.swift */; };
 		E29056264B57A3F0EC5F5698 /* SupportCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97986EE62AE844FFCCD27449 /* SupportCoordinator.swift */; };
@@ -802,6 +804,7 @@
 		F2AD20BFEA34E7553ACABE10 /* FileIndexCrawler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0333973AAC2B1F4653902175 /* FileIndexCrawler.swift */; };
 		F37AC0478A0A96243E833900 /* MCPCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CFFF4B2F2BF476AD9B111B9 /* MCPCoordinator.swift */; };
 		F3E0C5D483CC854D63448A4B /* UpdateReadiness.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76460C2D60828CC79F0CE972 /* UpdateReadiness.swift */; };
+		F3F1EA2E1D2177A25DE6975F /* CalculatorPinStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E31BADA2D44118CFC4AA0F3 /* CalculatorPinStore.swift */; };
 		F44DA0C81285A90138E13A7B /* ChatGPTSubscription.swift in Sources */ = {isa = PBXBuildFile; fileRef = D43E5D47E198B86901D75515 /* ChatGPTSubscription.swift */; };
 		F46DE2571A85FA24BD4E3B3A /* WindowSwitchEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 479047BCB47CE279EB1D256D /* WindowSwitchEntry.swift */; };
 		F4A75F90028F57D6DC1EF7DB /* ASCIIKeyboardLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2D1CA733FFAEF665D867A45 /* ASCIIKeyboardLayout.swift */; };
@@ -1266,6 +1269,7 @@
 		6D594CB90475093D58A2AB1E /* NoteSearch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteSearch.swift; sourceTree = "<group>"; };
 		6DA4145CFBB855DF1699C744 /* BackupCategory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupCategory.swift; sourceTree = "<group>"; };
 		6E06AA30E7BA44BC211B667F /* SnippetsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnippetsScreen.swift; sourceTree = "<group>"; };
+		6E31BADA2D44118CFC4AA0F3 /* CalculatorPinStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalculatorPinStore.swift; sourceTree = "<group>"; };
 		6EBB9959DB6CA493D241080C /* AIAttachmentPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIAttachmentPolicy.swift; sourceTree = "<group>"; };
 		6F2CBDE3042FDA4FCA561857 /* MCPComposerAddress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPComposerAddress.swift; sourceTree = "<group>"; };
 		6F7D0725CF7068879F86F0AA /* NoteRevealPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteRevealPolicy.swift; sourceTree = "<group>"; };
@@ -1386,6 +1390,7 @@
 		9188FA8A06EAE3E55FFCBC70 /* UpdateInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateInstaller.swift; sourceTree = "<group>"; };
 		91D0784E49BC5899A585F285 /* Scrypt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Scrypt.swift; sourceTree = "<group>"; };
 		920FAC043BC3887B6D2C314D /* EscapeKeyBehavior.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EscapeKeyBehavior.swift; sourceTree = "<group>"; };
+		9290E7ED10FEFC38C911E2F9 /* CalcDatePhrases.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalcDatePhrases.swift; sourceTree = "<group>"; };
 		92AF20F1007F7F3DC1013C2A /* CalloutShape.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalloutShape.swift; sourceTree = "<group>"; };
 		92B4495E56754B05B5F3551D /* CalcPercent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalcPercent.swift; sourceTree = "<group>"; };
 		92C3FC7FD77C74762B72637B /* ExtensionStorePanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionStorePanel.swift; sourceTree = "<group>"; };
@@ -1393,6 +1398,7 @@
 		934DBE501F116131DC1BF5CE /* CalcExpressionParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalcExpressionParser.swift; sourceTree = "<group>"; };
 		936C0D68CC32D90E590F712C /* ExtensionPickerField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionPickerField.swift; sourceTree = "<group>"; };
 		93CBB4251C94C31DE1BE6937 /* InjectableTextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InjectableTextView.swift; sourceTree = "<group>"; };
+		93CFB02BA7CD3A0F5E101099 /* CalculatorPinning.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalculatorPinning.swift; sourceTree = "<group>"; };
 		943495E91C0D09B633746515 /* ChatGPTSubscriptionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatGPTSubscriptionManager.swift; sourceTree = "<group>"; };
 		94507F8F095D3EBD1A9B3007 /* DialogController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DialogController.swift; sourceTree = "<group>"; };
 		946ABF992DAD60387381968C /* RoomSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoomSession.swift; sourceTree = "<group>"; };
@@ -1846,6 +1852,7 @@
 			isa = PBXGroup;
 			children = (
 				D2D032AC22E53BB9997E492F /* CalculatorHistoryStore.swift */,
+				6E31BADA2D44118CFC4AA0F3 /* CalculatorPinStore.swift */,
 				8FEAC591704D983A2C31188F /* CurrencyRateStore.swift */,
 				B469959F9681E35617041FF2 /* RegionNumberFormatMonitor.swift */,
 			);
@@ -1857,6 +1864,7 @@
 			children = (
 				2B0F5891A80B604FBE21897B /* CalcCurrency.swift */,
 				955FBE410967A64A05A2DA3D /* CalcDateFormatters.swift */,
+				9290E7ED10FEFC38C911E2F9 /* CalcDatePhrases.swift */,
 				38A97022BE0F95B5D19F0C26 /* CalcDateTime.swift */,
 				666E0A469BE1984BEF1A9A50 /* CalcDimension.swift */,
 				7817B7A8760B36FDA43F48FC /* CalcEngine.swift */,
@@ -2936,6 +2944,7 @@
 				518429EDBFBEA0B866CCAA81 /* CalculatorCoordinator.swift */,
 				86545F54669A075FBDA5D1F1 /* CalculatorHistoryScreen.swift */,
 				60CCB1A47E0022BAEDD1EE96 /* CalculatorHistoryView.swift */,
+				93CFB02BA7CD3A0F5E101099 /* CalculatorPinning.swift */,
 			);
 			path = UI;
 			sourceTree = "<group>";
@@ -4079,6 +4088,7 @@
 				9E514EA8EB0408653AC3D1D9 /* BundleSignature.swift in Sources */,
 				B6525300EEDACE4F9DC3179E /* CalcCurrency.swift in Sources */,
 				0F667981DF990EF41626F052 /* CalcDateFormatters.swift in Sources */,
+				D0D7E173F2277741921698E4 /* CalcDatePhrases.swift in Sources */,
 				ADE29D44A9504AC24FC17E72 /* CalcDateTime.swift in Sources */,
 				ED62826E3D7CEB357865F9EB /* CalcDimension.swift in Sources */,
 				309B1313B6B40D1342362492 /* CalcEngine.swift in Sources */,
@@ -4103,6 +4113,8 @@
 				9B3BC1DCC478DA7517F04182 /* CalculatorHistoryScreen.swift in Sources */,
 				5FB708EC91426C41762AB96B /* CalculatorHistoryStore.swift in Sources */,
 				5E155BEE2FC62267F516A343 /* CalculatorHistoryView.swift in Sources */,
+				F3F1EA2E1D2177A25DE6975F /* CalculatorPinStore.swift in Sources */,
+				E1A0C398524910DC4EDAC657 /* CalculatorPinning.swift in Sources */,
 				ABFC92E6F22D8D6715081D9F /* CalendarAccess.swift in Sources */,
 				EA077323DE71DAF8FE17693C /* CalendarCoordinator.swift in Sources */,
 				B89F00C65C0A01F4BFDB702F /* CalendarMenuBarItem.swift in Sources */,

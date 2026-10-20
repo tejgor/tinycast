@@ -23,7 +23,11 @@ struct CalculatorHistoryScreen: PaletteScreen {
     private var format: CalcNumberFormat { core.calcNumberFormat }
     private var calc: CalcResult? { CalcMemo.evaluate(vm.query, rates: currencyRates.rates, format: format) }
     /// History is stored canonical, so a localized query is searched in the same spelling.
-    private var entries: [CalcHistoryEntry] { history.search(format.canonical(vm.query) ?? vm.query) }
+    private var entries: [CalcHistoryEntry] {
+        let search = format.canonical(vm.query) ?? vm.query
+        return CalculatorPinning.liveEntries(core: core, rates: currencyRates.rates, matching: search)
+            + history.search(search)
+    }
 
     var rows: [Row] {
         let entries = entries.map(Row.entry)
@@ -59,7 +63,9 @@ struct CalculatorHistoryScreen: PaletteScreen {
         case .calc(let result):
             return result.isActionable ? CalcActionsMenu.content(result: result, core: core) : nil
         case .entry(let entry):
-            return CalcHistoryActionsMenu.content(entry: entry, core: core, calcHistory: history)
+            return CalculatorPinning.menu(
+                CalcHistoryActionsMenu.content(entry: entry, core: core, calcHistory: history),
+                adding: CalculatorPinning.entryItem(entry: entry, core: core, rates: currencyRates.rates))
         case nil:
             return nil
         }
@@ -91,6 +97,13 @@ struct CalculatorHistoryScreen: PaletteScreen {
         case .deleteAll:
             deleteAll()
             return true
+        case .pin:
+            switch row(at: selection) {
+            case .calc(let result): return CalculatorPinning.toggle(card: result, core: core)
+            case .entry(let entry):
+                return CalculatorPinning.toggle(entry: entry, core: core, rates: currencyRates.rates)
+            case nil: return false
+            }
         case .copyCalculation:
             guard case .calc(let result) = row(at: selection), result.isActionable else { return false }
             core.calculatorCoordinator.copyCalculationWithExpression(result)
@@ -102,7 +115,11 @@ struct CalculatorHistoryScreen: PaletteScreen {
     /// ⌘⌫ / ⌃X — the screen owns the chord, but the inline card can't be deleted.
     private func delete(at selection: Int) {
         guard let entry = entry(at: selection) else { return }
-        history.remove(entry)
+        if CalculatorPinning.isPinned(entry, core: core) {
+            core.calcPins.unpin(entry.id)
+        } else {
+            history.remove(entry)
+        }
     }
 
     /// ⌃⇧X — mirrors the Actions row, confirmation included; the live inline card isn't history.
@@ -125,6 +142,7 @@ struct CalculatorHistoryScreen: PaletteScreen {
         } else {
             CalculatorHistoryList(
                 results: entries,
+                pinnedIDs: core.calcPins.ids,
                 selectedID: entry(at: selection)?.id,
                 scroll: scroll,
                 calc: calc,

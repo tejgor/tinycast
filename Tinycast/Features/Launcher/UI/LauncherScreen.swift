@@ -330,6 +330,9 @@ struct LauncherScreen: PaletteScreen {
         case .copyPath: return copyQuicklink(at: selection)
         case .favoriteSlot(let index): return launchFavorite(at: index)
         case .copyCalculation: return copyCalculation(at: selection)
+        case .pin:
+            guard case .calc(let result) = row(at: selection) else { return false }
+            return CalculatorPinning.toggle(card: result, core: core)
         case .openInApp, .showDetails:
             guard let meeting = meeting(at: selection) else { return false }
             return MeetingActionsMenu.perform(shortcut, meeting: meeting, core: core)

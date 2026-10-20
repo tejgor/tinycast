@@ -4,6 +4,7 @@ import SwiftUI
 struct CalculatorHistoryList: View {
     @Environment(\.metrics) private var metrics
     let results: [CalcHistoryEntry]
+    var pinnedIDs: Set<UUID> = []
     let selectedID: CalcHistoryEntry.ID?
     /// Changes only when the list should scroll, so mouse selection never yanks the position.
     let scroll: ScrollIntent
@@ -43,11 +44,12 @@ struct CalculatorHistoryList: View {
     private var rows: [Row] {
         var rows: [Row] = []
         if let calc { rows = [.header(String(localized: "Calculator")), .calc(calc)] }
-        var currentBucket: DateBucket?
+        var currentBucket: String?
         for entry in results {
-            let bucket = DateBucket(for: entry.createdAt)
+            let bucket =
+                pinnedIDs.contains(entry.id) ? String(localized: "Pinned") : DateBucket(for: entry.createdAt).title
             if bucket != currentBucket {
-                rows.append(.header(bucket.title))
+                rows.append(.header(bucket))
                 currentBucket = bucket
             }
             rows.append(.entry(entry))
@@ -72,7 +74,9 @@ struct CalculatorHistoryList: View {
                                 .padding(.bottom, metrics.spacing.xs)
                                 .selectionFrame(calcSelected)
                         case .entry(let entry):
-                            CalcHistoryRow(entry: entry, selected: entry.id == selectedID)
+                            CalcHistoryRow(
+                                entry: entry, selected: entry.id == selectedID,
+                                pinned: pinnedIDs.contains(entry.id))
                                 .selectionFrame(entry.id == selectedID)
                                 .contentShape(Rectangle())
                                 .onTapGesture { onSelect(entry) }
@@ -107,6 +111,7 @@ private struct CalcHistoryRow: View {
     @Environment(AppCore.self) private var core
     let entry: CalcHistoryEntry
     let selected: Bool
+    var pinned = false
     @State private var hovered = false
 
     private var format: CalcNumberFormat { core.calcNumberFormat }
@@ -120,7 +125,7 @@ private struct CalcHistoryRow: View {
     var body: some View {
         IconCache.observeStyle()
         return HStack(spacing: metrics.spacing.lg) {
-            Image(nsImage: IconCache.symbolIcon(named: "plus.forwardslash.minus")).resizable()
+            Image(nsImage: IconCache.symbolIcon(named: pinned ? "pin" : "plus.forwardslash.minus")).resizable()
                 .frame(width: metrics.size.resultRowIcon, height: metrics.size.resultRowIcon)
             Text(format.localizedExpression(entry.expression))
                 .font(metrics.typography.rowTitle)

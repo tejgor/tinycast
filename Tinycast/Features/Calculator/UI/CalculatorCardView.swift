@@ -175,6 +175,7 @@ enum CalcActionsMenu {
             ) {
                 core.calculatorCoordinator.copyCalculationWithExpression(result)
             })
+        if let pin = CalculatorPinning.cardItem(result: result, core: core) { items.append(pin) }
         return PopoverMenuContent(
             header: core.calcNumberFormat.localizedExpression(result.expression), items: items)
     }

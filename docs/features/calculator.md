@@ -431,6 +431,31 @@ direction; `saturday + 1 business day` still lands on Monday.
 Public holidays are deliberately not modelled in either. The only supported source is EventKit, and a
 calculator must never provoke its Full Calendar Access grant mid-keystroke — see the invariant above.
 
+## Fork: Raycast-style date phrases
+
+`CalcDatePhrases` (fork-only) runs in `CalcEngine.evaluate` just before `CalcDateTime`, so upstream's
+grammars stay untouched. It reaches them through the small `extension CalcDateTime` at the end of
+that file (`resolveMoment`, `answerText`, …) rather than by widening upstream's `private` members.
+
+- **Rewrites into upstream grammar** cover most phrasings: `in 45 days` → `45 days from now`,
+  `3 weeks after X` → `X + 3 weeks`, `tomorrow 3pm` → `tomorrow at 3pm`, `now in unix` → `now to unix`,
+  and `1733823083000 to date`, where twelve digits or more read as milliseconds.
+- **Its own grammars**: `time until` / `how long since`, workday counts (`business days until X`,
+  weekdays in `(start, end]`, the inverse of `+ N workdays`), spans (`A to B`, `between A and B`,
+  `from A to B`, `A through B` inclusive, an optional unit before or after), `what day is X`,
+  ISO 8601 `week number`, and `days in` / `days left in` a month or year.
+- **`2h 30m`**: an `m` beside an hour or seconds quantity is rewritten to `min` and the query goes back
+  through the whole engine, so `3h 5m 10s in seconds` is a duration rather than a unit error.
+  A lone `5m` stays metres.
+- **Holidays** are replaced by a dated phrase (`25 dec 2026`) before anything parses, so every grammar
+  takes them. Gregorian ones are computed (the computus for Easter); lunar ones come from Foundation's
+  `chinese`, `islamicUmmAlQura` and `hebrew` calendars. Nothing reads EventKit, and workday counts still
+  skip only weekends. A holiday name alone stays a search, like any lone date word.
+- **Cost**: a word gate (`mayBeDatePhrase`) lets an app search leave after one pass; the measured
+  overhead is a few microseconds per keystroke. `Tests/calc-phrases-test.swift` covers it.
+- Subtraction keeps upstream's meaning, so `jan 10 - feb 5` stays `-26 days`; `jan 10 to feb 5` is the
+  span.
+
 ## Implicit multiplication
 
 Juxtaposition means `*` at the same binding power as an explicit one (`4(2+3)` → 20, `2pi`,
@@ -631,6 +656,12 @@ the list (flat selection index 0, shifting rows by one) and Enter copies the ans
 query with the caret after it, so the next step chains on. Only a `canChain` answer offers it:
 `CalcEngine` clears the flag on every `CalcDateTime` and `CalcTimeZone` answer, because a clock
 typed back reads as local time, and `CalcQuantity` clears it on a boolean.
+
+Fork: ⌘. (or ⌘K) on the card pins the typed query to `CalculatorPinStore`, its own
+`calculator-pins.json`, so the history cap never drops one. `CalculatorPinning.liveEntries` answers
+every pin again on each render and hands them to the history list as entries under **Pinned**. A past
+entry pins its expression only when that answers the same again or is a date or time, because a
+conversion's echo drops its target (`10km to mi` records `10 km`). Pins are not in backups.
 
 ## Number format
 
