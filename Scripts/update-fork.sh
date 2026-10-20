@@ -142,8 +142,10 @@ EOF
 
 if $REBUILD; then
     VERSION="$(git describe --tags --abbrev=0 "$BRANCH" | sed 's/^v//')"
+    notify "Rebuilding ${BRANCH}… Tinycast restarts when it's installed."
 else
     confirm_upstream
+    notify "Updating to v${VERSION}… Tinycast restarts when it's installed."
 fi
 
 CLAUDE_TIMEOUT="${TINYCAST_UPDATE_CLAUDE_TIMEOUT:-1800}"

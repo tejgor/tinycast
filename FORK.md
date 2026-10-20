@@ -22,6 +22,7 @@ locally on one Mac. Everything in `AGENTS.md` still applies; this file only adds
 | `Scripts/update-fork.sh --rollback` | Swaps the installed app with the previous build (`build/Tinycast-previous.app`) |
 
 - Logs go to `build/update.log`.
+- A notification says when an update or rebuild starts (after the confirm dialog) and when it ends.
 - Notifications come from `build/Tinycast Update.app`, a helper the script builds from
   `Scripts/update-notifier.swift` on first use (and rebuilds when that file changes) so they carry
   Tinycast's icon; clicking one opens the log. It falls back to AppleScript's notification if the
