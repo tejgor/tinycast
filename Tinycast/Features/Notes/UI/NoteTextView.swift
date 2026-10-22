@@ -50,6 +50,23 @@ final class NoteTextView: NSTextView, InjectableTextView {
         perform(action)
     }
 
+    /// A new width drops every line's layout, and estimated heights make the scroller jump.
+    override func setFrameSize(_ newSize: NSSize) {
+        let widthChanged = newSize.width != frame.width
+        super.setFrameSize(newSize)
+        if widthChanged, !inLiveResize { ensureFullLayout() }
+    }
+
+    override func viewDidEndLiveResize() {
+        super.viewDidEndLiveResize()
+        ensureFullLayout()
+    }
+
+    func ensureFullLayout() {
+        guard let textLayoutManager else { return }
+        textLayoutManager.ensureLayout(for: textLayoutManager.documentRange)
+    }
+
     func find(_ action: NSTextFinder.Action) {
         let item = NSMenuItem()
         item.tag = action.rawValue

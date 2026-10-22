@@ -35,6 +35,7 @@ struct NotesEditorTests {
         testTextHeight(rendersMarkdown: false)
         testTextHeight(rendersMarkdown: true)
         testHeightBeforeDraw()
+        testHeightIsExactBeforeScrolling()
         print(failures == 0 ? "Notes editor tests passed" : "\(failures) tests failed")
         exit(failures == 0 ? 0 : 1)
     }
@@ -70,6 +71,39 @@ struct NotesEditorTests {
     }
 
     /// The fit reads before any draw, so each height here is read right after its edit returns.
+    /// TextKit estimates lines it has not laid out, and a height that grows while scrolling jitters.
+    private static func testHeightIsExactBeforeScrolling() {
+        let source = String(repeating: "- An item long enough to wrap onto a second line here\n## Heading\n", count: 150)
+        let editor = makeEditor(
+            input: NoteEditorInput(id: NoteID(rawValue: "Scroll.md"), source: source, epoch: 0),
+            rendersMarkdown: true)
+        let textView = editor.textView
+        guard let scrollView = textView.enclosingScrollView, let manager = textView.textLayoutManager else {
+            check("the editor has a scroll view and a layout manager", false)
+            return
+        }
+        // The frame takes its height from the first viewport pass, as the window's first draw does.
+        manager.textViewportLayoutController.layoutViewport()
+        let installed = textView.frame.height
+        var heights: Set<CGFloat> = [installed]
+        var offset: CGFloat = 0
+        while offset < textView.frame.height {
+            scrollView.contentView.scroll(to: NSPoint(x: 0, y: offset))
+            manager.textViewportLayoutController.layoutViewport()
+            heights.insert(textView.frame.height)
+            offset += 120
+        }
+        check("a long note's height is exact before it scrolls and never moves while it does", heights.count == 1)
+        textView.setFrameSize(NSSize(width: 160, height: textView.frame.height))
+        manager.textViewportLayoutController.layoutViewport()
+        let narrowed = textView.frame.height
+        manager.ensureLayout(for: manager.documentRange)
+        manager.textViewportLayoutController.layoutViewport()
+        check(
+            "a narrower note is laid out again at once, so its new height is already the exact one",
+            narrowed > installed && textView.frame.height == narrowed)
+    }
+
     private static func testHeightBeforeDraw() {
         let mixed = [
             "# Title", "Intro", "", "## Section", "- item", "- [ ] task", "1. one", "> quote", "---", "```",

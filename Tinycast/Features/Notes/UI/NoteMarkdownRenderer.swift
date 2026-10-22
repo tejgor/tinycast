@@ -185,7 +185,7 @@ final class NoteMarkdownRenderer: NSObject, @MainActor NSTextStorageDelegate {
         invalidateLayout(range)
     }
 
-    /// Without this, a paragraph keeps the fragment it was vended before its decoration changed.
+    /// Re-vended for its new decoration, and laid out now so no estimated height moves the scroller.
     private func invalidateLayout(_ range: NSRange) {
         guard let textView, let content = textView.textContentStorage,
             let start = content.location(content.documentRange.location, offsetBy: range.location),
@@ -193,5 +193,6 @@ final class NoteMarkdownRenderer: NSObject, @MainActor NSTextStorageDelegate {
             let textRange = NSTextRange(location: start, end: end)
         else { return }
         textView.textLayoutManager?.invalidateLayout(for: textRange)
+        textView.textLayoutManager?.ensureLayout(for: textRange)
     }
 }

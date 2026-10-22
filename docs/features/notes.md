@@ -229,8 +229,16 @@ a clear colour, so it stays in the string at almost no width. Fence and rule lin
 normal font instead, so they keep their row height. Every list item (bullet, numbered or task) gets 8
 points of space after it, rendered or revealed, so items read as separate rows and moving the caret
 never shifts them; a wrapped item keeps normal line spacing. A restyle writes straight to `NSTextStorage` inside
-`beginEditing` and `endEditing`, then invalidates layout for those lines. It never calls
-`shouldChangeText`, which is what keeps styling off the undo stack.
+`beginEditing` and `endEditing`, then invalidates layout for those lines and lays them out again at
+once. It never calls `shouldChangeText`, which is what keeps styling off the undo stack.
+
+**No line's height is ever an estimate.** TextKit 2 lays out only the viewport and estimates the
+rest, and a long note's estimate is far short: a 213-line note measured 1,778 points where it is
+6,802, so its height grew under the scroller 84 times on one pass from top to bottom, and the
+thumb and text jumped. A restyle therefore lays out what it invalidated, so `reset()` lays out the
+whole note on install, and `NoteTextView.setFrameSize` lays out the whole note again when its width
+changes — at the end of a live resize rather than on every step of one. Full layout measured 10 ms
+for that note and 73 ms for one twelve times its size.
 
 A bullet or numbered marker becomes a list only after a space or tab; a lone `-` or `1.` stays literal.
 
