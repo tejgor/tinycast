@@ -75,6 +75,10 @@ locally on one Mac. Everything in `AGENTS.md` still applies; this file only adds
 - Notes lays out the whole note rather than letting TextKit 2 estimate off-screen heights, which
   made a long note's height (and the scroller) jump while scrolling (`NoteTextView.setFrameSize`,
   `NoteMarkdownRenderer.invalidateLayout`).
+- File Search phase 1: hidden files off by default, `.gitignore` / `.ignore` / `.rayignore` obeyed
+  (two switches in its settings), more default exclusions, and ranking that weighs personal folders,
+  recency, files opened from Tinycast and depth (`FileSearchIgnoreRules`, `FileSearchUsage`,
+  `FileSearchQuery`; `project.yml` adds the rules file to `FileIndexHelper`).
 - A Table button in the Notes formatting bar inserts an empty three-column table
   (`NoteEditAction.insertTable`); the minimum note window grew from 440 to 470 points to fit it.
 - Notes behaves more like Raycast Notes (see `docs/features/notes.md`):

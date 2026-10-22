@@ -31,13 +31,13 @@ final class FileSearchSession {
     }
 
     /// No debounce: a search costs milliseconds, and the worker already runs only the newest.
-    init(index: FileIndex) {
+    init(index: FileIndex, boosts: @escaping @Sendable () -> [String: Int] = { [:] }) {
         searchOperation = { query, filter in
             await Task.detached(priority: .userInitiated) {
                 guard let prepared = FileSearchQuery.prepare(query) else {
                     return index.recent(filter: filter)
                 }
-                return index.search(prepared, filter: filter)
+                return index.search(prepared, filter: filter, boosts: boosts())
             }.value
         }
     }

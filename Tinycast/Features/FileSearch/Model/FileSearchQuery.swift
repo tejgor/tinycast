@@ -8,6 +8,9 @@ enum FileSearchQuery {
     /// Category search's threshold too: below it a query matches too many names to be useful.
     static let launcherMinimumLength = 3
     static let priorWeight = 1_500
+    /// What each folder of depth below home costs past the first few, so a deep copy trails.
+    static let depthPenalty = 100
+    static let freeDepth = 4
     static let nonASCIIBit: UInt64 = 1 << 40
 
     struct Prepared: Sendable {
@@ -65,6 +68,29 @@ enum FileSearchQuery {
         }
     }
 
+    /// A step per tier up to home; a personal folder adds half a step, a lead and not a wall.
+    static func priorBonus(_ prior: Int8) -> Int {
+        prior <= 2 ? Int(prior) * priorWeight : 2 * priorWeight + priorWeight / 2
+    }
+
+    /// Seconds since the epoch on both sides; a date in the future reads as just now.
+    static func recencyBonus(mtime: UInt32, now: UInt32) -> Int {
+        let age = now > mtime ? now - mtime : 0
+        switch age {
+        case ..<86_400: return 600
+        case ..<604_800: return 400
+        case ..<2_592_000: return 200
+        default: return 0
+        }
+    }
+
+    /// Depth below home, read off a path the results already built.
+    static func depthCost(of path: String, home: String) -> Int {
+        let below = path.hasPrefix(home + "/") ? path.dropFirst(home.count) : Substring(path)
+        let depth = below.utf8.reduce(0) { $1 == 0x2F ? $0 + 1 : $0 }
+        return max(0, depth - freeDepth) * depthPenalty
+    }
+
     static func score(
         _ query: Prepared, name: UnsafeBufferPointer<UInt8>, mask: UInt64, prior: Int8
     ) -> Int? {
@@ -83,9 +109,11 @@ enum FileSearchQuery {
         }
         let lead = query.terms[0]
         let wholeAt = query.terms.count == 1 ? first : find(query.whole, in: name)
-        var score = Int(prior) * priorWeight - 4 * name.count
+        var score = priorBonus(prior) - 4 * name.count
         if wholeAt == 0, name.count == query.whole.count {
             score += 4_000
+        } else if wholeAt == 0, isStem(query.whole.count, of: name) {
+            score += 3_500
         } else if query.terms.count > 1, wholeAt != nil {
             score += 1_500
         }
@@ -128,6 +156,11 @@ enum FileSearchQuery {
     @inline(__always)
     private static func isAlphanumeric(_ byte: UInt8) -> Bool {
         byte &- 0x61 < 26 || byte &- 0x41 < 26 || byte &- 0x30 < 10 || byte >= 0x80
+    }
+
+    /// `readme` is the whole of `README.md` but for its extension: one dot, then no other.
+    private static func isStem(_ length: Int, of name: UnsafeBufferPointer<UInt8>) -> Bool {
+        length < name.count && name[length] == 0x2E && !name[(length + 1)...].contains(0x2E)
     }
 
     private static func isBoundary(_ name: UnsafeBufferPointer<UInt8>, at index: Int) -> Bool {

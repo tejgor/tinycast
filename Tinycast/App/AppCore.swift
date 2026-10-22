@@ -61,7 +61,9 @@ final class AppCore {
     let runningApps = RunningAppsMonitor()
     let palette = PaletteState()
     let fileIndexer = FileIndexer()
-    @ObservationIgnored private(set) lazy var fileSearch = FileSearchSession(index: fileIndexer.index)
+    let fileSearchUsage = FileSearchUsageStore()
+    @ObservationIgnored private(set) lazy var fileSearch = FileSearchSession(
+        index: fileIndexer.index, boosts: { [usage = fileSearchUsage] in usage.boosts() })
     let dictionary = DictionarySession()
     let menuSearch = MenuSearchSession()
     let windowSwitch = WindowSwitchSession()
@@ -740,6 +742,8 @@ final class AppCore {
                 _ = $0.fileSearchScopes
                 _ = $0.fileSearchIgnorePatterns
                 _ = $0.fileSearchRemovedDefaultPatterns
+                _ = $0.fileSearchIncludesHidden
+                _ = $0.fileSearchUsesIgnoreFiles
             }, reproject: { $0.fileSearchCoordinator.applyPolicy() })
         track({ _ = $0.snippetsEnabled }, reproject: { $0.snippetCoordinator.applySnippetsEnabled() })
         // Not a feature switch, but the same re-projection: a combo has the chord's ⇧ bit baked in.

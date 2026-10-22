@@ -90,6 +90,8 @@ enum SettingsFileSchema {
         case .fileSearchRemovedDefaultPatterns:
             return bind(settings, \.fileSearchRemovedDefaultPatterns)
         case .fileSearchShowInLauncher: return bind(settings, \.fileSearchShowInLauncher)
+        case .fileSearchIncludesHidden: return bind(settings, \.fileSearchIncludesHidden)
+        case .fileSearchUsesIgnoreFiles: return bind(settings, \.fileSearchUsesIgnoreFiles)
         case .fileSearchCommands: return launcher.commandsBinding(for: key, owner: .fileSearch)
         case .notesEnabled: return bind(settings, \.notesEnabled)
         case .notesRendersMarkdown: return bind(settings, \.notesRendersMarkdown)

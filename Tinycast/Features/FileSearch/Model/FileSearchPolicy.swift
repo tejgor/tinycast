@@ -5,6 +5,8 @@ struct FileSearchPolicy: Sendable, Equatable {
         let scopes: [String]
         let ignorePatterns: [String]
         let homeDirectory: String
+        let includesHidden: Bool
+        let usesIgnoreFiles: Bool
     }
 
     let request: Request
@@ -25,12 +27,19 @@ struct FileSearchPolicy: Sendable, Equatable {
     private static let cloudDrives = [
         "/Library/CloudStorage", "/Library/Mobile Documents/com~apple~CloudDocs"
     ]
+    /// Where a person keeps their own files, so a hit there leads one anywhere else in home.
+    private static let personalFolders = ["/Desktop", "/Documents", "/Downloads"]
+    /// Bumped when what a crawl stores changes, so an index built the old way is rebuilt.
+    private static let layoutVersion = "priors-2"
 
-    init(scopes: [String], ignorePatterns: [String], homeDirectory: URL) {
+    init(
+        scopes: [String], ignorePatterns: [String], homeDirectory: URL, includesHidden: Bool = false,
+        usesIgnoreFiles: Bool = true
+    ) {
         self.init(
             Request(
-                scopes: scopes, ignorePatterns: ignorePatterns,
-                homeDirectory: homeDirectory.path))
+                scopes: scopes, ignorePatterns: ignorePatterns, homeDirectory: homeDirectory.path,
+                includesHidden: includesHidden, usesIgnoreFiles: usesIgnoreFiles))
     }
 
     init(_ request: Request) {
@@ -40,20 +49,22 @@ struct FileSearchPolicy: Sendable, Equatable {
         homePath = homeDirectory.path
         roots = FileSearchScope.roots(for: request.scopes, homeDirectory: homeDirectory)
         ignore = FileSearchIgnoreList(patterns: request.ignorePatterns, homeDirectory: homeDirectory)
-        fingerprint = Self.fnv1a((roots + ["\0"] + request.ignorePatterns).joined(separator: "\n"))
+        let switches = ["hidden=\(request.includesHidden)", "ignoreFiles=\(request.usesIgnoreFiles)", Self.layoutVersion]
+        fingerprint = Self.fnv1a((roots + ["\0"] + request.ignorePatterns + ["\0"] + switches).joined(separator: "\n"))
     }
 
     static func == (lhs: Self, rhs: Self) -> Bool { lhs.request == rhs.request }
 
-    /// A folder's files inherit its prior, so it is worked out once per folder.
+    /// A folder's files inherit its prior, so it is worked out once per folder: 2 and up is home.
     func prior(of path: String) -> Int8 {
         if FileSearchScope.contains(homePath, path) {
             let rest = path.dropFirst(homePath.count)
             for cloud in Self.cloudDrives where rest == cloud || rest.hasPrefix(cloud + "/") {
-                return Self.isPlain(rest.dropFirst(cloud.count)) ? 2 : 0
+                return Self.isPlain(rest.dropFirst(cloud.count)) ? 3 : 0
             }
             if rest == "/Library" || rest.hasPrefix("/Library/") { return 0 }
-            return Self.isPlain(rest) ? 2 : 0
+            guard Self.isPlain(rest) else { return 0 }
+            return Self.personalFolders.contains { rest == $0 || rest.hasPrefix($0 + "/") } ? 3 : 2
         }
         if let top = path.split(separator: "/").first, Self.systemFolders.contains(top) { return 0 }
         return Self.isPlain(path[...]) ? 1 : 0

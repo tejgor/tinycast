@@ -42,7 +42,9 @@ final class FileSearchCoordinator {
             FileSearchPolicy(
                 scopes: settings.fileSearchScopes,
                 ignorePatterns: settings.fileSearchEffectiveIgnorePatterns,
-                homeDirectory: FileManager.default.homeDirectoryForCurrentUser))
+                homeDirectory: FileManager.default.homeDirectoryForCurrentUser,
+                includesHidden: settings.fileSearchIncludesHidden,
+                usesIgnoreFiles: settings.fileSearchUsesIgnoreFiles))
     }
 
     var showsFilesInLauncher: Bool {
@@ -86,6 +88,7 @@ final class FileSearchCoordinator {
     }
 
     func open(_ result: FileSearchResult) {
+        core.fileSearchUsage.recordOpen(of: result.url.path)
         paletteCoordinator.hidePalette(restoreFocus: false)
         Task {
             do {
@@ -148,6 +151,7 @@ final class FileSearchCoordinator {
                     try FileManager.default.trashItem(at: result.url, resultingItemURL: nil)
                 }.value
                 session.remove(result)
+                core.fileSearchUsage.forget(result.url.path)
                 core.showMessage(String(localized: "Moved to Trash"))
             } catch {
                 await core.showNotice(

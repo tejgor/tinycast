@@ -13,7 +13,7 @@ final class FileIndex: Sendable {
         let prior: Int8
         let mask: UInt64
 
-        var isRecent: Bool { prior == 2 && !isDirectory }
+        var isRecent: Bool { prior >= 2 && !isDirectory }
     }
 
     private struct State: Sendable {
@@ -40,7 +40,7 @@ final class FileIndex: Sendable {
             guard dead[index >> 6] & bit == 0 else { return }
             dead[index >> 6] |= bit
             deadCount += 1
-            if snapshot.prior[index] == 2, !snapshot.isDirectory(index) { recentRevision &+= 1 }
+            if snapshot.prior[index] >= 2, !snapshot.isDirectory(index) { recentRevision &+= 1 }
         }
 
         mutating func add(_ path: String, _ child: FileIndexCrawler.Child) {
@@ -93,10 +93,17 @@ final class FileIndex: Sendable {
         }
     }
 
-    func search(_ query: FileSearchQuery.Prepared, filter: FileSearchFilter) -> [FileSearchResult] {
+    /// `boosts` lifts files by path, as opening them from Tinycast earns; `now` dates recency.
+    func search(
+        _ query: FileSearchQuery.Prepared, filter: FileSearchFilter, boosts: [String: Int] = [:],
+        now: UInt32 = UInt32(clamping: Int(Date().timeIntervalSince1970))
+    ) -> [FileSearchResult] {
         let state = state.withLock { $0 }
         guard let snapshot = state.snapshot, let policy = state.policy else { return [] }
         let limit = FileSearchQuery.resultLimit
+        let boosted = boosts.reduce(into: [Int: Int]()) { found, use in
+            if let index = snapshot.lookup(use.key) { found[index] = use.value }
+        }
         let names = NameScores(count: snapshot.nameCount)
         Self.chunked(0..<snapshot.nameCount, alignment: 64) { range in
             for id in range where snapshot.nameMask[id] & query.mask == query.mask {
@@ -115,7 +122,10 @@ final class FileIndex: Sendable {
                     guard let score = names.score(id), !state.isDead(index),
                         types.accepts(name: snapshot.name(id: id), isDirectory: snapshot.isDirectory(index))
                     else { continue }
-                    top.insert(score + FileSearchQuery.priorWeight * Int(snapshot.prior[index]), index)
+                    let recency = FileSearchQuery.recencyBonus(mtime: snapshot.mtime[index], now: now)
+                    top.insert(
+                        score + FileSearchQuery.priorBonus(snapshot.prior[index]) + recency + (boosted[index] ?? 0),
+                        index)
                 }
             }
         var ranked = base.map { hit in
@@ -135,7 +145,15 @@ final class FileIndex: Sendable {
                 return score
             }
             guard let score else { continue }
-            ranked.append(Ranked(score: score, path: path, isDirectory: entry.isDirectory))
+            let recency = FileSearchQuery.recencyBonus(mtime: entry.mtime, now: now)
+            ranked.append(
+                Ranked(score: score + recency + (boosts[path] ?? 0), path: path, isDirectory: entry.isDirectory))
+        }
+        let home = policy.homeDirectory.path
+        ranked = ranked.map { hit in
+            Ranked(
+                score: hit.score - FileSearchQuery.depthCost(of: hit.path, home: home), path: hit.path,
+                isDirectory: hit.isDirectory)
         }
         return Self.results(ranked, limit: limit, policy: policy)
     }
@@ -146,7 +164,7 @@ final class FileIndex: Sendable {
         let limit = FileSearchQuery.recentLimit
         let base = Self.collect(snapshot, limit: limit) { range, top in
             var types = TypeFilter(filter: filter)
-            for index in range where snapshot.prior[index] == 2 && !snapshot.isDirectory(index) {
+            for index in range where snapshot.prior[index] >= 2 && !snapshot.isDirectory(index) {
                 guard !state.isDead(index),
                     types.accepts(name: snapshot.name(index), isDirectory: false)
                 else { continue }
@@ -285,7 +303,8 @@ final class FileIndex: Sendable {
         /// Both sides are sorted by name bytes, so one merge pass finds every difference.
         mutating func compare(base: Int?, prior: Int8, using lister: FileIndexCrawler.Lister) -> Bool {
             let overlayNames = state.addedChildren[folder] ?? []
-            let listed: Void? = lister.list(folder, prior: prior, policy: policy) { entries, order, name in
+            let rules = FileIndexCrawler.inheritedRules(for: folder, policy: policy)
+            let listed: Void? = lister.list(folder, prior: prior, rules: rules, policy: policy) { entries, order, name in
                 let rows = base.map(snapshot.children(of:)) ?? 0..<0
                 var row = rows.lowerBound
                 var overlaySeen = 0
@@ -334,7 +353,8 @@ final class FileIndex: Sendable {
                 for row in snapshot.children(of: base) { killIfAlive(row) }
             }
             for name in state.addedChildren[folder] ?? [] { removeAdded(name) }
-            let listed: Void? = lister.list(folder, prior: prior, policy: policy) { entries, _, name in
+            let rules = FileIndexCrawler.inheritedRules(for: folder, policy: policy)
+            let listed: Void? = lister.list(folder, prior: prior, rules: rules, policy: policy) { entries, _, name in
                 for entry in entries { add(entry, named: String(decoding: name(entry), as: UTF8.self)) }
             }
             guard listed != nil else { return false }
@@ -345,7 +365,7 @@ final class FileIndex: Sendable {
         /// Only Recent reads a date, and it lists home files alone, so other churn is ignored.
         private func hasChanged(_ row: Int, to entry: FileIndexCrawler.Entry) -> Bool {
             if snapshot.isDirectory(row) != entry.isDirectory { return true }
-            return !entry.isDirectory && snapshot.prior[row] == 2 && snapshot.mtime[row] != entry.mtime
+            return !entry.isDirectory && snapshot.prior[row] >= 2 && snapshot.mtime[row] != entry.mtime
         }
 
         private mutating func update(_ name: String, to entry: FileIndexCrawler.Entry) {
@@ -357,7 +377,7 @@ final class FileIndex: Sendable {
             if added.isDirectory != entry.isDirectory {
                 changes.removals.append((path, added.isDirectory))
                 add(entry, named: name)
-            } else if !entry.isDirectory, added.prior == 2, added.mtime != entry.mtime {
+            } else if !entry.isDirectory, added.prior >= 2, added.mtime != entry.mtime {
                 add(entry, named: name)
             }
         }
@@ -385,9 +405,11 @@ final class FileIndex: Sendable {
             if child.isDirectory { newFolders.append((path, child.prior)) }
         }
 
+        /// The listed folder's rules, read before the walk lists anything else.
         private mutating func walkNewFolders(using lister: FileIndexCrawler.Lister) {
+            let rules = lister.rules
             for (path, prior) in newFolders {
-                changes.additions += lister.walk(path, prior: prior, policy: policy)
+                changes.additions += lister.walk(path, prior: prior, rules: rules, policy: policy)
             }
             newFolders = []
         }

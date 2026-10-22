@@ -226,7 +226,16 @@ private struct FileSearchIgnoreSection: View {
     private var patterns: [String] { settings.fileSearchEffectiveIgnorePatterns }
 
     var body: some View {
+        @Bindable var settings = settings
         Section {
+            Toggle(isOn: $settings.fileSearchIncludesHidden) {
+                SettingsRowTitle(.fileSearchIgnorePatterns, "Include hidden files")
+                Text("Files and folders whose names start with a dot.")
+            }
+            Toggle(isOn: $settings.fileSearchUsesIgnoreFiles) {
+                SettingsRowTitle(.fileSearchIgnorePatterns, "Use ignore files")
+                Text("Skips what .gitignore, .ignore and .rayignore files list.")
+            }
             ForEach(patterns, id: \.self) { pattern in
                 PatternRow(pattern: pattern) { remove(pattern) }
             }

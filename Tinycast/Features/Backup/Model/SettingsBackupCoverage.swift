@@ -110,6 +110,10 @@ enum SettingsBackupCoverage {
             "A personal-fork preference; an upstream build reading the backup has no field for it.",
         AppSettingsKey.notesShowsMenuBarButton.rawValue:
             "A personal-fork preference; an upstream build reading the backup has no field for it.",
+        AppSettingsKey.fileSearchIncludesHidden.rawValue:
+            "A personal-fork preference; an upstream build reading the backup has no field for it.",
+        AppSettingsKey.fileSearchUsesIgnoreFiles.rawValue:
+            "A personal-fork preference; an upstream build reading the backup has no field for it.",
         AppSettingsKey.paletteTransparency.rawValue:
             "A personal-fork preference; an upstream build reading the backup has no field for it.",
         AppSettingsKey.autoSwitchInputSource.rawValue:

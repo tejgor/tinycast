@@ -19,9 +19,15 @@ design follows [fsearch](https://github.com/noahdunnagan/fsearch).
   launcher's.
 - **A matching ignore pattern skips a folder and everything in it at crawl time.** Changing either list
   rebuilds the index, debounced by a second; the old index serves until the new one maps.
-- **Hidden files and bundle contents are indexed.** They rank last instead (see Ranking), and the ignore
-  list is how a user narrows further. Mount points are never entered, which keeps firmlinked files from
-  appearing twice through `/System/Volumes/Data` and keeps other volumes out.
+- **Hidden files are left out unless Include hidden files is on; bundle contents are indexed.** A name
+  starting with a dot is dropped as it is listed, folder and contents alike — measured on a developer's
+  home, a third of every entry sat in a dot folder (`.codex`, `.config`, tool caches). A scope that is
+  itself hidden is still crawled, since only names beneath a root are filtered. With the switch on,
+  hidden entries rank last. Bundle contents rank last too, and the ignore list is how a user narrows
+  further. Mount points are never entered, which keeps firmlinked files from appearing twice through
+  `/System/Volumes/Data` and keeps other volumes out.
+- **Ignore files are obeyed while Use ignore files is on, as git reads them.** See
+  [Ignore files](#ignore-files).
 - **A crawl never downloads.** Every listing runs with `IOPOL_MATERIALIZE_DATALESS_FILES_OFF` on its own
   thread, so dataless iCloud and File Provider items are listed as they are.
 - **A live update is idempotent.** Every FSEvents event relists one folder and diffs it, so a replay, a
@@ -86,15 +92,26 @@ non-ASCII bytes is folded through Foundation first. The second walks the entries
 name matched, adding the entry's prior and applying the type filter. Each chunk keeps its best 200, only
 the overall best 200 have their paths built, and the overlay of live additions is scored the same way.
 
-One score orders the results: exact name +4000, name starts with the first term +2000, first term at a
-word or camel-case boundary +1000, terms typed in order +1500, first term ending a word +500, the prior
-× 1500, minus 4 per name byte. Ties go to the shorter path.
+One score orders the results: exact name +4000, the name exactly but for one extension (`readme` for
+`README.md`) +3500, name starts with the first term +2000, first term at a word or camel-case boundary
++1000, terms typed in order +1500, first term ending a word +500, the prior's bonus, minus 4 per name
+byte. Then three signals from the entry itself: **recency** of its modification date (+600 within a
+day, +400 a week, +200 a month), **use** — a file opened from Tinycast gains +1500 for 30 days and
++900 after, +300 for each repeat up to the fourth — and **depth**, −100 for every folder below home past
+the fourth, applied once the best 200 have their paths. Ties go to the shorter path.
 
-`prior` is set per folder at crawl time and inherited by its files: 2 under home and the cloud drives,
-1 elsewhere in plain sight (`/Applications`, `/Users/Shared`), 0 for hidden paths, system folders,
-`~/Library` and anything inside a bundle.
+`prior` is set per folder at crawl time and inherited by its files: 3 in `~/Desktop`, `~/Documents`,
+`~/Downloads` and the cloud drives, 2 elsewhere under home, 1 elsewhere in plain sight (`/Applications`,
+`/Users/Shared`), 0 for hidden paths, system folders, `~/Library` and anything inside a bundle. Its bonus
+is a tier's 1500 per step up to 2, and 3 adds only half a step, so a personal folder leads a project's
+same-named file without burying it. 2 and up is "the person's own": that is what Recent lists.
 
-An empty query lists **Recent**: the 20 newest files with prior 2, by modification date. The session
+Use lives in `FileSearchUsageStore` (`file-search-usage.json` in Application Support, at most 300 paths,
+the least recently opened going first), which `FileSearchCoordinator.open` writes and a trash forgets.
+`FileSearchSession` reads its boosts on each search and `FileIndex.search` maps them to entries with
+`lookup`, so a boost reaches a hit before the best 200 are chosen, not after.
+
+An empty query lists **Recent**: the 20 newest files with prior 2 or more, by modification date. The session
 keeps those rows across closes and recomputes them in the background whenever the index is swapped in
 or a live update reaches a file Recent can list, so the screen opens on current rows at once. That
 recompute never touches the published results, so a list on screen holds still. Each run is stamped,
@@ -165,7 +182,26 @@ the `~/.cache` and `~/.npm` caches, and the noisy parts of `~/Library` — `Appl
 `Caches`, `Containers`, `Developer`, `Group Containers` and `Mail`. Together they hold most of a home
 folder's entries and most of its churn: one browser's cache alone rewrites tens of thousands of files
 on every page load. `Preferences`, `LaunchAgents` and the cloud drives stay indexed. `/Library/Caches`
-and `/private/var/folders` cover a scope added outside home.
+and `/private/var/folders` cover a scope added outside home. Measured on one developer's home, four more
+`~/Library` folders held a fifth of the index between them — `pnpm` (its package store, 118k entries),
+`Daemon Containers`, `Messages` and `Metadata` — and Python's `site-packages`, `__pycache__` and `venv`
+and Go's `~/go/pkg/mod` repeat other people's code, so all of them are defaults too.
+
+## Ignore files
+
+`.gitignore`, `.ignore` and `.rayignore` in any crawled folder, and `.git/info/exclude` in a repository,
+apply to that folder and everything beneath it, by git's rules: blank lines and `#` comments are
+skipped, the last matching pattern decides, `!` re-includes, a trailing `/` matches folders only, a
+slash anywhere else anchors the pattern to the file's folder, `**` spans any number of folders (none
+included), and matching folds case as git does on macOS. A folder a rule skips is never entered, so
+nothing beneath it can be re-included. A global `core.excludesFile` is not read.
+
+`FileSearchIgnoreRules` is the pure part, parsing and matching. The crawler notes which ignore files a
+folder holds as it lists it — they are hidden names, seen before hidden entries are dropped — reads
+them once the whole folder is listed, filters that folder's entries, and hands the combined rules to
+each subfolder it queues. A live update lists one folder, so `FileIndexCrawler.inheritedRules` reads
+the ignore files from that folder's scope root down first. An edited ignore file takes effect for the
+folder it sits in on its next event; what it newly skips or allows deeper takes a rebuild.
 
 The pane lists `FileSearchIgnoreList.patterns(added:removedDefaults:)`: the defaults the user kept,
 then what they added. Adding a removed default takes it off the removed list rather than storing it
@@ -291,7 +327,11 @@ fitted cache, purged when the palette hides.
 Settings ▸ File Search owns the `fileSearchEnabled` switch, which is off when its preference is absent,
 the **Show in launcher** switch beneath it, along with the Full Disk Access status, the index status and **Rebuild Index**, the scope list, the
 ignore patterns and the Search Files command row. The lists are ordinary settings carried by Tinycast
-settings backups; importing them grants no permission.
+settings backups; importing them grants no permission. Above the patterns, **Include hidden files**
+(`fileSearchIncludesHidden`, off when absent) and **Use ignore files** (`fileSearchUsesIgnoreFiles`, on
+when absent) are part of the policy and its fingerprint, so flipping either rebuilds the index; both
+stay out of backups, and `settings.json` mirrors them as `fileSearch.includeHidden` and
+`fileSearch.useIgnoreFiles`.
 
 `AppCore` observes the switch and asks `FileSearchCoordinator` to project `CommandID.searchFiles` into
 the launcher and to start or stop `FileIndexer`; a second observation hands it the new policy when either

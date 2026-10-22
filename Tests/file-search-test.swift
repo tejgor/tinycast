@@ -33,6 +33,9 @@ struct FileSearchTests {
         typeFilter()
         ignoreRules()
         ignorePathMatching()
+        ignoreFileRules()
+        rankingSignals()
+        usage()
         policy()
         scopes()
         resultModel()
@@ -160,7 +163,9 @@ struct FileSearchTests {
         }
         for path in [
             "/Users/test/.Trash", "/Users/test/Library/Caches", "/Users/test/Library/Containers",
-            "/Users/test/Library/Application Support", "/Library/Caches", "/private/var/folders"
+            "/Users/test/Library/Application Support", "/Library/Caches", "/private/var/folders",
+            "/Users/test/Library/pnpm", "/Users/test/Library/Messages", "/Users/test/go/pkg/mod",
+            "/Users/test/Developer/tool/venv", "/Users/test/Developer/tool/lib/site-packages"
         ] {
             expect(
                 shipped.excludes(name: URL(filePath: path).lastPathComponent, path: path),
@@ -230,6 +235,80 @@ struct FileSearchTests {
         check(["/x/Reports/"], name: "Reports", path: "/x/Reports", excluded: false, builds: 1)
     }
 
+    static func ignoreFileRules() {
+        let repo = "/Users/test/repo"
+        let rules = FileSearchIgnoreRules.adding(
+            ["# comment\n\nbuild/\n*.log\n!keep.log\n/top.txt\ndocs/**/draft.md\nlib/**\n\\#hash\n"],
+            base: repo, to: nil)
+        let ignores = { (folder: String, name: String, directory: Bool) in
+            rules?.ignores(name: name, isDirectory: directory, in: folder) ?? false
+        }
+        expect(ignores(repo + "/a/b", "build", true) && !ignores(repo, "build", false), "a trailing slash means folders only")
+        expect(ignores(repo + "/x", "trace.LOG", false), "a bare glob matches a name at any depth, case aside")
+        expect(!ignores(repo, "keep.log", false), "a later negation wins")
+        expect(ignores(repo, "top.txt", false) && !ignores(repo + "/x", "top.txt", false), "a leading slash anchors")
+        expect(
+            ignores(repo + "/docs", "draft.md", false) && ignores(repo + "/docs/a/b", "draft.md", false),
+            "** matches no folder or several")
+        expect(!ignores(repo, "lib", true) && ignores(repo + "/lib", "x.swift", false), "a trailing ** needs something inside")
+        expect(ignores(repo, "#hash", false), "an escaped # is a pattern, not a comment")
+        expect(!ignores("/Users/test/other", "top.txt", false), "an anchored rule stays in its own folder")
+        let nested = FileSearchIgnoreRules.adding(["!debug.log\n"], base: repo + "/sub", to: rules)
+        expect(
+            nested?.ignores(name: "debug.log", isDirectory: false, in: repo + "/sub") == false
+                && nested?.ignores(name: "debug.log", isDirectory: false, in: repo) == true,
+            "a deeper file overrides its parent's rule beneath it alone")
+        expect(
+            FileSearchIgnoreRules.adding(["# only a comment\n"], base: repo, to: nil) == nil,
+            "a file with no rules adds nothing")
+        let source = { (name: String) in Array(name.utf8).withUnsafeBufferPointer(FileSearchIgnoreRules.Sources.named) }
+        expect(
+            source(".gitignore") == .gitignore && source(".rayignore") == .rayignore && source(".ignore") == .ignore
+                && source(".git") == .gitExclude && source(".gitkeep").isEmpty,
+            "ignore files are recognised by name")
+    }
+
+    static func rankingSignals() {
+        expect(
+            score("readme", "README.md")! > score("readme", "readme-old")!,
+            "a name that is the query but for its extension ranks as exact")
+        expect(score("readme", "README")! - score("readme", "README.md")! < 600, "and nearly as high as an exact name")
+        expect(score("readme", "readme.backup.md")! < score("readme", "README.md")!, "two extensions are not one")
+        expect(
+            FileSearchQuery.priorBonus(3) - FileSearchQuery.priorBonus(2) == FileSearchQuery.priorWeight / 2,
+            "a personal folder leads by half a tier")
+        expect(
+            FileSearchQuery.recencyBonus(mtime: 1_000, now: 1_000 + 3_600) == 600
+                && FileSearchQuery.recencyBonus(mtime: 1_000, now: 1_000 + 3 * 86_400) == 400
+                && FileSearchQuery.recencyBonus(mtime: 1_000, now: 1_000 + 400 * 86_400) == 0
+                && FileSearchQuery.recencyBonus(mtime: 5_000, now: 1_000) == 600,
+            "recency steps down by day, week and month, and a future date is new")
+        expect(
+            FileSearchQuery.depthCost(of: "/Users/test/a/b/c/d.txt", home: "/Users/test") == 0
+                && FileSearchQuery.depthCost(of: "/Users/test/a/b/c/d/e/f.txt", home: "/Users/test")
+                    == 2 * FileSearchQuery.depthPenalty,
+            "only depth past the first few folders costs")
+    }
+
+    static func usage() {
+        var usage = FileSearchUsage()
+        usage = usage.recording("/a", at: 0).recording("/a", at: 10).recording("/b", at: 20)
+        let now = 20.0
+        let boosts = usage.boosts(now: now)
+        expect(
+            boosts["/a"] == FileSearchUsage.recentBoost + FileSearchUsage.repeatBoost
+                && boosts["/b"] == FileSearchUsage.recentBoost,
+            "an open boosts a file, and a repeat boosts it more")
+        expect(
+            usage.boosts(now: 40 * 86_400)["/b"] == FileSearchUsage.staleBoost,
+            "an old open still lifts a file, by less")
+        for index in 0..<FileSearchUsage.capacity { usage = usage.recording("/f\(index)", at: 100 + Double(index)) }
+        expect(
+            usage.uses.count == FileSearchUsage.capacity && usage.uses["/a"] == nil && usage.uses["/f0"] != nil,
+            "past capacity the least recently opened goes")
+        expect(usage.removing("/f0").uses["/f0"] == nil, "a trashed file is forgotten")
+    }
+
     static func policy() {
         let policy = FileSearchPolicy(
             scopes: ["~/Developer", "~", "/Volumes/Work", "~/Developer"],
@@ -259,11 +338,12 @@ struct FileSearchTests {
 
         let priors: [(String, Int8)] = [
             ("/Users/test", 2),
-            ("/Users/test/Documents/Work", 2),
+            ("/Users/test/Documents/Work", 3),
+            ("/Users/test/Developer/app", 2),
             ("/Users/test/.config", 0),
             ("/Users/test/Library/Caches", 0),
-            ("/Users/test/Library/CloudStorage/Dropbox/Team", 2),
-            ("/Users/test/Library/Mobile Documents/com~apple~CloudDocs/Notes", 2),
+            ("/Users/test/Library/CloudStorage/Dropbox/Team", 3),
+            ("/Users/test/Library/Mobile Documents/com~apple~CloudDocs/Notes", 3),
             ("/Users/test/Developer/Tool.app/Contents", 0),
             ("/Applications", 1),
             ("/Applications/Xcode.app", 0),

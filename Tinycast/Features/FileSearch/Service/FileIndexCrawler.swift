@@ -17,6 +17,10 @@ nonisolated enum FileIndexCrawler {
     struct Listing: Sendable {
         var names: [UInt8] = []
         var entries: [Entry] = []
+        /// Seen while listing, since an ignore file is itself a hidden name the listing may drop.
+        var ignoreSources: FileSearchIgnoreRules.Sources = []
+        /// What applies beneath the folder: its parents' ignore files and its own.
+        var rules: FileSearchIgnoreRules?
 
         func name(of entry: Entry) -> String {
             let start = Int(entry.nameStart)
@@ -69,6 +73,8 @@ nonisolated enum FileIndexCrawler {
         private let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 64 * 1024, alignment: 8)
         private var listing = Listing()
         private var order: [Int] = []
+        /// The last listed folder's rules, which its new subfolders are walked with.
+        var rules: FileSearchIgnoreRules? { listing.rules }
 
         deinit {
             buffer.deallocate()
@@ -76,13 +82,15 @@ nonisolated enum FileIndexCrawler {
 
         /// Hands `body` the entries sorted by name bytes, or returns nil when the folder won't open.
         func list<T>(
-            _ path: String, prior: Int8, policy: FileSearchPolicy,
+            _ path: String, prior: Int8, rules: FileSearchIgnoreRules?, policy: FileSearchPolicy,
             _ body: (_ entries: [Entry], _ order: [Int], _ name: (Entry) -> UnsafeBufferPointer<UInt8>) -> T
         ) -> T? {
             listing.names.removeAll(keepingCapacity: true)
             listing.entries.removeAll(keepingCapacity: true)
+            listing.ignoreSources = []
             let listed = FileIndexCrawler.withoutMaterializing {
-                FileIndexCrawler.list(path, prior: prior, policy: policy, buffer: buffer, into: &listing)
+                FileIndexCrawler.list(
+                    path, prior: prior, rules: rules, policy: policy, buffer: buffer, into: &listing)
             }
             guard listed else { return nil }
             // A huge folder's storage is not kept for the small ones that follow.
@@ -106,18 +114,20 @@ nonisolated enum FileIndexCrawler {
             }
         }
 
-        func walk(_ root: String, prior: Int8, policy: FileSearchPolicy) -> [(String, Child)] {
+        func walk(
+            _ root: String, prior: Int8, rules: FileSearchIgnoreRules?, policy: FileSearchPolicy
+        ) -> [(String, Child)] {
             var found: [(String, Child)] = []
-            var pending = [(root, prior)]
-            while let (folder, prior) = pending.popLast() {
-                list(folder, prior: prior, policy: policy) { entries, _, name in
+            var pending = [(root, prior, rules)]
+            while let (folder, prior, rules) = pending.popLast() {
+                list(folder, prior: prior, rules: rules, policy: policy) { entries, _, name in
                     for entry in entries {
                         let child = Child(
                             entry, name: String(decoding: name(entry), as: UTF8.self), parent: folder,
                             policy: policy)
                         let childPath = FileIndexCrawler.path(folder, child.name)
                         found.append((childPath, child))
-                        if child.isDirectory { pending.append((childPath, child.prior)) }
+                        if child.isDirectory { pending.append((childPath, child.prior, self.rules)) }
                     }
                 }
             }
@@ -154,7 +164,7 @@ nonisolated enum FileIndexCrawler {
     }()
 
     private static func list(
-        _ path: String, prior: Int8, policy: FileSearchPolicy,
+        _ path: String, prior: Int8, rules inherited: FileSearchIgnoreRules?, policy: FileSearchPolicy,
         buffer: UnsafeMutableRawBufferPointer, into listing: inout Listing
     ) -> Bool {
         let descriptor = open(path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
@@ -170,7 +180,59 @@ nonisolated enum FileIndexCrawler {
                 record += Int(record.loadUnaligned(as: UInt32.self))
             }
         }
+        applyIgnoreFiles(in: path, inheriting: inherited, policy: policy, to: &listing)
         return true
+    }
+
+    /// The whole folder is listed first, since its ignore files can come back in any order.
+    private static func applyIgnoreFiles(
+        in folder: String, inheriting inherited: FileSearchIgnoreRules?, policy: FileSearchPolicy,
+        to listing: inout Listing
+    ) {
+        guard policy.request.usesIgnoreFiles else { return }
+        listing.rules = FileSearchIgnoreRules.adding(
+            ignoreTexts(in: folder, sources: listing.ignoreSources), base: folder, to: inherited)
+        guard let rules = listing.rules else { return }
+        let names = listing.names
+        listing.entries.removeAll { entry in
+            let start = Int(entry.nameStart)
+            let name = String(decoding: names[start..<start + Int(entry.nameLength)], as: UTF8.self)
+            return rules.ignores(name: name, isDirectory: entry.isDirectory, in: folder)
+        }
+    }
+
+    /// Never downloads one: a dataless file in a cloud folder reads as missing.
+    static func ignoreTexts(in folder: String, sources: FileSearchIgnoreRules.Sources) -> [String] {
+        sources.files.compactMap { try? String(contentsOfFile: path(folder, $0), encoding: .utf8) }
+    }
+
+    /// For a live update, which lists one folder: every ignore file from its scope root down.
+    static func inheritedRules(for folder: String, policy: FileSearchPolicy) -> FileSearchIgnoreRules? {
+        guard policy.request.usesIgnoreFiles,
+            let root = roots(of: policy).map(\.path).filter({ FileSearchScope.contains($0, folder) })
+                .max(by: { $0.count < $1.count }),
+            folder != root
+        else { return nil }
+        var rules: FileSearchIgnoreRules?
+        var current = root
+        let below = folder.dropFirst(root == "/" ? 1 : root.count + 1).split(separator: "/").dropLast()
+        for component in [""] + below.map(String.init) {
+            if !component.isEmpty { current = path(current, component) }
+            let present = FileIndexCrawler.presentSources(in: current)
+            rules = FileSearchIgnoreRules.adding(ignoreTexts(in: current, sources: present), base: current, to: rules)
+        }
+        return rules
+    }
+
+    private static func presentSources(in folder: String) -> FileSearchIgnoreRules.Sources {
+        var sources: FileSearchIgnoreRules.Sources = []
+        for (source, name) in [
+            (FileSearchIgnoreRules.Sources.gitExclude, ".git/info/exclude"), (.gitignore, ".gitignore"),
+            (.ignore, ".ignore"), (.rayignore, ".rayignore")
+        ] where access(path(folder, name), F_OK) == 0 {
+            sources.insert(source)
+        }
+        return sources
     }
 
     private static func append(
@@ -199,6 +261,10 @@ nonisolated enum FileIndexCrawler {
             mtime = field.loadUnaligned(as: timespec.self).tv_sec
             field += MemoryLayout<timespec>.size
         }
+        if name.pointee == 0x2E, length > 0, policy.request.usesIgnoreFiles {
+            let bytes = UnsafeRawPointer(name).assumingMemoryBound(to: UInt8.self)
+            listing.ignoreSources.formUnion(.named(UnsafeBufferPointer(start: bytes, count: length)))
+        }
         // Not entered: `/System/Volumes/Data` would list every firmlinked file a second time.
         if returned.dirattr & attrgroup_t(truncatingIfNeeded: ATTR_DIR_MOUNTSTATUS) != 0 {
             let status = field.loadUnaligned(as: UInt32.self)
@@ -214,6 +280,7 @@ nonisolated enum FileIndexCrawler {
 
         let isDirectory = type == VDIR.rawValue
         let isHidden = name.pointee == 0x2E
+        if isHidden, !policy.request.includesHidden { return }
         listing.entries.append(
             Entry(
                 nameStart: UInt32(listing.names.count), nameLength: UInt16(length),
@@ -225,7 +292,7 @@ nonisolated enum FileIndexCrawler {
     final class Crawl: @unchecked Sendable {
         private let policy: FileSearchPolicy
         private let condition = NSCondition()
-        private var pending: [(id: UInt32, path: String, prior: Int8)]
+        private var pending: [(id: UInt32, path: String, prior: Int8, rules: FileSearchIgnoreRules?)]
         private var finished: [(id: UInt32, listing: Listing)] = []
         private var busy = 0
         private var nextID: UInt32
@@ -235,7 +302,7 @@ nonisolated enum FileIndexCrawler {
         init(roots: [(path: String, prior: Int8)], policy: FileSearchPolicy) {
             self.policy = policy
             pending = roots.enumerated().reversed().map { index, root in
-                (UInt32(index), root.path, root.prior)
+                (UInt32(index), root.path, root.prior, nil)
             }
             nextID = UInt32(roots.count)
         }
@@ -262,7 +329,7 @@ nonisolated enum FileIndexCrawler {
 
                 var listing = Listing()
                 _ = FileIndexCrawler.list(
-                    folder.path, prior: folder.prior, policy: policy, buffer: buffer,
+                    folder.path, prior: folder.prior, rules: folder.rules, policy: policy, buffer: buffer,
                     into: &listing)
                 var folders: [(index: Int, path: String)] = []
                 for index in listing.entries.indices where listing.entries[index].isDirectory {
@@ -275,7 +342,7 @@ nonisolated enum FileIndexCrawler {
                 condition.lock()
                 for (index, path) in folders {
                     listing.entries[index].child = nextID
-                    pending.append((nextID, path, listing.entries[index].prior))
+                    pending.append((nextID, path, listing.entries[index].prior, listing.rules))
                     nextID += 1
                 }
                 listedCount += listing.entries.count

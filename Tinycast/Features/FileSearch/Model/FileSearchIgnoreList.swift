@@ -8,7 +8,9 @@ struct FileSearchIgnoreList: Sendable, Equatable {
         "node_modules", ".git", ".build", "build", "dist", "target", "DerivedData", "Pods", ".next",
         ".venv", "*.photoslibrary", "~/.Trash", "~/.cache", "~/.npm", "~/Library/Application Support",
         "~/Library/Caches", "~/Library/Containers", "~/Library/Developer", "~/Library/Group Containers",
-        "~/Library/Mail", "/Library/Caches", "/private/var/folders"
+        "~/Library/Mail", "/Library/Caches", "/private/var/folders",
+        "~/Library/pnpm", "~/Library/Daemon Containers", "~/Library/Messages", "~/Library/Metadata",
+        "site-packages", "__pycache__", "venv", "~/go/pkg/mod"
     ]
 
     /// A shipped rule is governed by `removedDefaults` alone, even when `added` repeats it.

@@ -342,6 +342,15 @@ final class AppSettings {
             added: fileSearchIgnorePatterns, removedDefaults: fileSearchRemovedDefaultPatterns)
     }
 
+    /// Off by default, as dotfiles and tool caches are most of a home folder and none of its work.
+    var fileSearchIncludesHidden: Bool {
+        didSet { defaults.set(fileSearchIncludesHidden, forKey: Key.fileSearchIncludesHidden.rawValue) }
+    }
+
+    var fileSearchUsesIgnoreFiles: Bool {
+        didSet { defaults.set(fileSearchUsesIgnoreFiles, forKey: Key.fileSearchUsesIgnoreFiles.rawValue) }
+    }
+
     var fileSearchShowInLauncher: Bool {
         didSet {
             defaults.set(fileSearchShowInLauncher, forKey: Key.fileSearchShowInLauncher.rawValue)
@@ -774,6 +783,10 @@ final class AppSettings {
         fileSearchRemovedDefaultPatterns =
             defaults.stringArray(forKey: Key.fileSearchRemovedDefaultPatterns.rawValue) ?? []
         fileSearchShowInLauncher = defaults.bool(forKey: Key.fileSearchShowInLauncher.rawValue)
+        fileSearchIncludesHidden = defaults.bool(forKey: Key.fileSearchIncludesHidden.rawValue)
+        fileSearchUsesIgnoreFiles =
+            defaults.object(forKey: Key.fileSearchUsesIgnoreFiles.rawValue) == nil
+            || defaults.bool(forKey: Key.fileSearchUsesIgnoreFiles.rawValue)
         notesEnabled = defaults.bool(forKey: Key.notesEnabled.rawValue)
         dictationEnabled = defaults.bool(forKey: Key.dictationEnabled.rawValue)
         dictationMode =

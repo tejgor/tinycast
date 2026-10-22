@@ -373,7 +373,13 @@ enum SettingsSearchCatalog {
             keywords: ["folders", "locations", "home", "whole disk", "add folder"]),
         .init(
             group: .fileSearchIgnorePatterns, "Ignore Patterns",
-            keywords: ["exclude", "glob", "node_modules", "skip", "ignore folder"])
+            keywords: ["exclude", "glob", "node_modules", "skip", "ignore folder"]),
+        .init(
+            .fileSearchIgnorePatterns, "Include hidden files",
+            keywords: ["dotfiles", "dot", "hidden", "invisible"]),
+        .init(
+            .fileSearchIgnorePatterns, "Use ignore files",
+            keywords: ["gitignore", "rayignore", "ignore file", "git"])
     ]
 
     private static let notes: [SettingsSearchEntry] = [

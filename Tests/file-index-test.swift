@@ -26,8 +26,10 @@ struct FileIndexTests {
             try write(root.appending(path: file))
         }
 
+        // Hidden files on, so the live checks below still cover a hidden folder's churn.
         let policy = FileSearchPolicy(
-            scopes: [root.path], ignorePatterns: ["node_modules", "~/Movies"], homeDirectory: root)
+            scopes: [root.path], ignorePatterns: ["node_modules", "~/Movies"], homeDirectory: root,
+            includesHidden: true)
         let index = FileIndex()
         let snapshot = try build(policy, at: scratch.appending(path: "index.bin"))
         index.replace(with: snapshot, policy: policy)
@@ -35,6 +37,7 @@ struct FileIndexTests {
         layout(snapshot, root: root.path)
         search(index, root: root.path)
         try live(index, root: root, policy: policy)
+        try ignoreFiles(in: scratch)
 
         print(failures == 0 ? "File index tests passed" : "\(failures) file index tests failed")
         exit(failures == 0 ? 0 : 1)
@@ -149,6 +152,56 @@ struct FileIndexTests {
         expect(
             !index.apply(folder: developer.path + "/application/node_modules"),
             "an event in a skipped folder is ignored")
+    }
+
+    /// The defaults: hidden files out, and every `.gitignore`, `.ignore` and `.rayignore` obeyed.
+    static func ignoreFiles(in scratch: URL) throws {
+        let home = URL(fileURLWithPath: realPath(scratch.path)).appending(path: "ignoring")
+        let repo = home.appending(path: "Developer/repo")
+        for file in [
+            "Developer/repo/src/app.swift", "Developer/repo/build-output/bundle.js", "Developer/repo/debug.log",
+            "Developer/repo/keep.log", "Developer/repo/secret.txt", "Developer/repo/src/secret.txt",
+            "Developer/repo/docs/a/b/draft.md", "Developer/repo/docs/draft.md", "Developer/repo/docs/final.md",
+            "Developer/repo/src/generated/model.swift", ".config/tool.json", "Documents/report.pdf"
+        ] {
+            try write(home.appending(path: file))
+        }
+        try "# build\nbuild-output/\n*.log\n!keep.log\n/secret.txt\ndocs/**/draft.md\n".write(
+            to: repo.appending(path: ".gitignore"), atomically: true, encoding: .utf8)
+        try "src/generated\n".write(to: repo.appending(path: ".rayignore"), atomically: true, encoding: .utf8)
+
+        let policy = FileSearchPolicy(scopes: [home.path], ignorePatterns: [], homeDirectory: home)
+        let index = FileIndex()
+        let snapshot = try build(policy, at: scratch.appending(path: "ignoring.bin"))
+        index.replace(with: snapshot, policy: policy)
+        let kept = { (path: String) in snapshot.lookup(repo.path + "/" + path) != nil }
+        expect(snapshot.lookup(home.path + "/.config") == nil, "hidden folders are left out by default")
+        expect(snapshot.lookup(repo.path + "/.gitignore") == nil, "and so is the ignore file itself")
+        expect(kept("src/app.swift") && kept("docs/final.md"), "files no rule names are kept")
+        expect(!kept("build-output") && !kept("debug.log"), "a folder rule and a glob skip what they name")
+        expect(kept("keep.log"), "a negated rule brings a file back")
+        expect(!kept("secret.txt") && kept("src/secret.txt"), "a leading slash anchors to the ignore file's folder")
+        expect(!kept("docs/a/b/draft.md") && !kept("docs/draft.md"), "** spans any number of folders, none included")
+        expect(!kept("src/generated"), ".rayignore is obeyed beside .gitignore")
+
+        try write(repo.appending(path: "src/trace.log"))
+        try write(repo.appending(path: "src/util.swift"))
+        index.apply(folder: repo.appending(path: "src").path)
+        expect(
+            names(index, "util") == ["util.swift"] && names(index, "trace").isEmpty,
+            "a live update in a subfolder still obeys the ignore files above it")
+
+        let off = FileSearchPolicy(
+            scopes: [home.path], ignorePatterns: [], homeDirectory: home, usesIgnoreFiles: false)
+        let unfiltered = try build(off, at: scratch.appending(path: "unfiltered.bin"))
+        expect(
+            unfiltered.lookup(repo.path + "/build-output/bundle.js") != nil && off.fingerprint != policy.fingerprint,
+            "turning ignore files off indexes what they named, under another fingerprint")
+
+        let report = index.search(FileSearchQuery.prepare("report")!, filter: .all).first
+        let app = repo.path + "/src/app.swift"
+        let boosted = index.search(FileSearchQuery.prepare("a")!, filter: .all, boosts: [app: 5_000])
+        expect(report?.name == "report.pdf" && boosted.first?.url.path == app, "a boost puts an opened file first")
     }
 
     static func names(

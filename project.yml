@@ -116,6 +116,7 @@ targets:
     sources:
       - Tinycast/Features/FileSearch/Helper/FileIndexHelper.swift
       - Tinycast/Features/FileSearch/Model/FileSearchIgnoreList.swift
+      - Tinycast/Features/FileSearch/Model/FileSearchIgnoreRules.swift
       - Tinycast/Features/FileSearch/Model/FileSearchPolicy.swift
       - Tinycast/Features/FileSearch/Model/FileSearchQuery.swift
       - Tinycast/Features/FileSearch/Model/FileSearchScope.swift
