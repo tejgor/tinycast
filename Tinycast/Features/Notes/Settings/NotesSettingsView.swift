@@ -31,9 +31,9 @@ struct NotesSettingsView: View {
                     Text("Escape returns to the previous app and keeps the note on screen.")
                 }
                 .settingsEnabled(settings.notesEnabled)
-                Toggle(isOn: $settings.notesShowsMenuBarButton) {
-                    SettingsRowTitle(.notesOptions, "Show Notes Button in Menu Bar")
-                    Text("Click it to show or hide the notes window.")
+                Toggle(isOn: $settings.notesShowsInMenuBar) {
+                    SettingsRowTitle(.notesOptions, "Show in Menu Bar")
+                    Text("Right-click the icon to create or search notes.")
                 }
                 .settingsEnabled(settings.notesEnabled)
                 LabeledContent {

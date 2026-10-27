@@ -115,6 +115,12 @@ failed flush retains the draft for retry.
 - **Create Note** creates and selects one unique Untitled note, including from an empty channel.
 - **Search Notes** shows the same panel with the switcher open and its search field focused.
 
+Settings > Notes > **Show in Menu Bar** is `AppSettings.notesShowsInMenuBar`, off when absent and
+carried by settings backups. While it and Notes are both on, `NotesCoordinator` owns a
+`NotesMenuBarController`: a click on its status item is Show Notes, and a right-, Control- or
+Option-click opens a menu of Create Note and Search Notes. Turning either setting off removes the
+status item rather than hiding it.
+
 Command-N creates, Command-P opens or refocuses the switcher, Command-O opens the Notes folder, and
 Command-F opens AppKit's find bar in the active note. ⌘[ and ⌘] walk `NoteHistory`, the notes shown
 this session, like a browser's back and forward: opening a note drops what was ahead, a rename carries
@@ -134,8 +140,7 @@ Both windows are one `NotesPanel`, a non-activating floating panel that owns the
 claims ⌘N, ⌘P, ⌘O, ⌘F, ⌘W, ⌘[, ⌘], ⌘=, ⌘−, ⌘0 and ⇧⌘+ (`shiftCommandChords`), and the switcher reads
 ⌘N plus ⌘W and ⌘P as dismissals.
 
-Settings > Notes > **Show Notes Button in Menu Bar** adds `NotesMenuBarButton`, a status item whose
-click toggles the window like Show Notes. The footer's count is a button: a click switches it between
+The footer's count is a button: a click switches it between
 characters and words (`NotesLocalState.countsWords`), where a word is any whitespace-separated run
 holding a letter or digit, so list markers and checkboxes are not counted. Duplicate Note copies the
 active note beside it and opens the copy, unnamed when the original is; Delete All Notes confirms, then

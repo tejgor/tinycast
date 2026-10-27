@@ -39,11 +39,15 @@ enum SettingsFileSchema {
         case .supportReminders: return bind(settings, \.supportRemindersEnabled)
         case .language: return bind(settings, \.language)
         case .appearance: return bind(settings, \.appearance)
+        case .animationsEnabled: return bind(settings, \.animationsEnabled)
         case .interfaceSize: return bind(settings, \.interfaceSize)
         case .compactMode: return bind(settings, \.compactMode)
         case .paletteTransparency:
             return bind(settings, \.paletteTransparency) { (0...100).contains($0) ? $0 : nil }
-        case .showFavoritesInCompactMode: return bind(settings, \.showFavoritesInCompactMode)
+        case .compactBarCommands:
+            return bind(settings, \.compactBarCommands) {
+                CommandID.validCompactBarCommands($0) ? $0 : nil
+            }
         case .openOnCursorScreen: return bind(settings, \.openOnCursorScreen)
         case .paletteDraggable: return bind(settings, \.paletteDraggable)
         case .hyperKey: return bind(settings, \.hyperKey)
@@ -97,12 +101,13 @@ enum SettingsFileSchema {
         case .notesRendersMarkdown: return bind(settings, \.notesRendersMarkdown)
         case .notesShowsFormattingBar: return bind(settings, \.notesShowsFormattingBar)
         case .notesEscapeLosesFocus: return bind(settings, \.notesEscapeLosesFocus)
-        case .notesShowsMenuBarButton: return bind(settings, \.notesShowsMenuBarButton)
+        case .notesShowsInMenuBar: return bind(settings, \.notesShowsInMenuBar)
         case .notesFolder: return bind(settings, \.notesFolder, accept: folder)
         case .notesCommands: return launcher.commandsBinding(for: key, owner: .notes)
         case .dictationMode: return bind(settings, \.dictationMode)
         case .dictationShortcut:
             return shortcuts.binding(for: key, action: .dictation, name: String(localized: "Dictation"))
+        case .dictationPlaysSounds: return bind(settings, \.dictationPlaysSounds)
         case .dictationModel: return bind(settings, \.dictationModel)
         case .dictationMicrophone: return bind(settings, \.dictationMicrophone)
         case .dictationDestination: return bind(settings, \.dictationDestination)
@@ -172,6 +177,7 @@ enum SettingsFileSchema {
 
 extension PopToRootTimeout: SettingsFileRawValue {}
 extension EscapeKeyBehavior: SettingsFileRawValue {}
+extension CommandID: SettingsFileRawValue {}
 extension AppAppearance: SettingsFileRawValue {}
 extension AppLanguage: SettingsFileRawValue {}
 extension InterfaceSize: SettingsFileRawValue {}

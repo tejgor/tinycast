@@ -37,14 +37,19 @@ export async function Hero() {
           </p>
 
           <h1
-            className="blur-in mt-6 text-display"
+            className="blur-in @container mt-6 text-display"
             style={{ animationDelay: "60ms" }}
           >
             <span className="sr-only">
               {`${hero.headline.swap[0]} ${hero.headline.rest} ${hero.headline.second}`}
             </span>
-            <span aria-hidden="true" className="block">
-              <SwapWords words={hero.headline.swap} /> {hero.headline.rest}
+            {/* 10.6em fits the widest swap plus the rest, so no swap can ever rewrap the line. */}
+            <span
+              aria-hidden="true"
+              className="block @min-[10.6em]:whitespace-nowrap"
+            >
+              <SwapWords words={hero.headline.swap} />
+              <span className="@max-[10.6em]:block"> {hero.headline.rest}</span>
             </span>
             <span aria-hidden="true" className="block">
               {hero.headline.second}

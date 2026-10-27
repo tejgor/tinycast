@@ -23,6 +23,7 @@ final class NotesCoordinator {
     private(set) var isActionsPresented = false
     private(set) var actionsQuery = ""
     private(set) var actionsSelection: String?
+    @ObservationIgnored private var menuBarController: NotesMenuBarController?
     @ObservationIgnored private var loadTask: Task<Void, Never>?
     @ObservationIgnored private var issueTask: Task<Void, Never>?
     @ObservationIgnored private var operationTask: Task<Void, Never>?
@@ -47,7 +48,6 @@ final class NotesCoordinator {
     private(set) var noteCounts: [NoteID: Int] = [:]
     /// A deeplink that arrived while the window was hidden, opened once the editor shows.
     @ObservationIgnored private var pendingLinkedNote: NoteID?
-    @ObservationIgnored private lazy var menuBarButton = NotesMenuBarButton { [weak self] in self?.toggle() }
     private var presentationGeneration = 0
 
     @ObservationIgnored private let saveFormattingBarExpanded: @Sendable (Bool) -> Void
@@ -71,7 +71,6 @@ final class NotesCoordinator {
         self.local = local
         store.onIssue = { [weak self] issue in self?.present(issue) }
         trackHistory()
-        trackMenuBarButton()
     }
 
     var editorInput: NoteEditorInput {
@@ -118,15 +117,6 @@ final class NotesCoordinator {
         let existing = Set(store.summaries.map(\.id))
         guard let id = history.step(offset, exists: existing.contains) else { return }
         select(id)
-    }
-
-    private func trackMenuBarButton() {
-        let shown = withObservationTracking {
-            settings.notesEnabled && settings.notesShowsMenuBarButton
-        } onChange: { [weak self] in
-            Task { @MainActor in self?.trackMenuBarButton() }
-        }
-        menuBarButton.setShown(shown)
     }
 
     /// Re-armed after every change, so each note the window shows lands in the history once.
@@ -386,6 +376,7 @@ final class NotesCoordinator {
         enablementGeneration &+= 1
         let generation = enablementGeneration
         appIndex.setCommandsVisible([.showNotes, .createNote, .searchNotes], settings.notesEnabled)
+        applyMenuBarItem()
         guard !settings.notesEnabled else { return }
         presentationGeneration &+= 1
         pendingPresentation = nil
@@ -401,6 +392,13 @@ final class NotesCoordinator {
             guard generation == enablementGeneration, !settings.notesEnabled else { return }
             store.stop()
         }
+    }
+
+    func applyMenuBarItem() {
+        let shows = settings.notesEnabled && settings.notesShowsInMenuBar
+        guard shows != (menuBarController != nil) else { return }
+        menuBarController?.remove()
+        menuBarController = shows ? NotesMenuBarController(coordinator: self) : nil
     }
 
     /// Quit waits on this so the 300 ms autosave debounce cannot swallow the last edit.

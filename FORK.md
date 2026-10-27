@@ -86,7 +86,9 @@ locally on one Mac. Everything in `AGENTS.md` still applies; this file only adds
     Return in a list scroll the caret into view;
   - ⌘L link, ⇧⌘S strikethrough, ⌘↵ checkbox, ⌘[ / ⌘] history (`NoteHistory`), ⌘+ / ⌘− / ⌘0 zoom,
     a character/word count toggle, Duplicate Note, Delete All Notes;
-  - Settings → Notes → Escape Key Loses Focus and Show Notes Button in Menu Bar (fork-only, not in backups).
+  - Settings → Notes → Escape Key Loses Focus (fork-only, not in backups). The fork's Show Notes
+    Button in Menu Bar gave way to upstream's Show in Menu Bar; `NotesMenuBarButtonMigration` carries
+    the old toggle over and is deleted after one release.
   - pins (⇧⌘P, ⌘1–⌘9), a browser with Pinned/Notes sections and "Opened … • N characters" rows, and a
     ⌘K action panel (`NoteActionsWindowController`) with copy/export as Markdown, HTML or plain text
     (`NoteExport`), deeplinks (`NoteDeepLink`, `tinycast://notes/open?id=…`), duplicate and delete all.
@@ -96,7 +98,8 @@ locally on one Mac. Everything in `AGENTS.md` still applies; this file only adds
   `days in`, `in 45 days`, `2h 30m`. Tested by `Tests/calc-phrases-test.swift`.
 - Pinned Calculator History entries that are answered live (`CalculatorPinStore`, `CalculatorPinning`,
   ⌘. on a card or entry). Pins live in `calculator-pins.json` and are not in backups.
-- Settings → General → Transparency thins the scrim over the launcher's and the note window's glass
+- Settings → General → Transparency thins the scrim over the launcher's (compact bar included) and
+  the note window's glass
   (`AppSettings.paletteTransparency`, `appearance.transparency` in `settings.json`; not in backups).
 
 ## Adding a feature without making merges painful
