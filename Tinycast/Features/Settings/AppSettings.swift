@@ -249,7 +249,7 @@ final class AppSettings {
         didSet { defaults.set(compactMode, forKey: Key.compactMode.rawValue) }
     }
 
-    /// Percent of the launcher's scrim taken off its glass: 0 is the standard tint, 100 bare glass.
+    /// Percent of the scrim taken off the launcher's glass: 0 is the full tint, 100 (default) bare glass.
     var paletteTransparency: Int {
         didSet { defaults.set(paletteTransparency, forKey: Key.paletteTransparency.rawValue) }
     }
@@ -755,7 +755,9 @@ final class AppSettings {
         compactMode =
             defaults.object(forKey: Key.compactMode.rawValue) == nil
             || defaults.bool(forKey: Key.compactMode.rawValue)
-        paletteTransparency = min(max(defaults.integer(forKey: Key.paletteTransparency.rawValue), 0), 100)
+        paletteTransparency =
+            defaults.object(forKey: Key.paletteTransparency.rawValue) == nil
+            ? 100 : min(max(defaults.integer(forKey: Key.paletteTransparency.rawValue), 0), 100)
         compactBarCommands =
             defaults.stringArray(forKey: Key.compactBarCommands.rawValue)
             .flatMap(CommandID.compactBarCommands(from:)) ?? CommandID.defaultCompactBarCommands

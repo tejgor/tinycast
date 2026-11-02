@@ -20,6 +20,8 @@ produces, rendered natively into the palette. No Electron, no browser, no Node.j
 - **Bridges share one private HTTP transport, never execution state.** Cookies, credential storage and
   URL caching are disabled. Individual task cancellation leaves other requests running; releasing the
   fetcher invalidates its session so CFNetwork does not retain discarded connections and sessions.
+  Only its session configuration opts out of the AppSSO broker through the private `_preventsAppSSO`
+  property when its setter is available. Other sessions keep their own authentication behavior.
 - **An idle menu item holds no JavaScript.** Once `isLoading` clears, keep only the native button and
   its snapshot. Reload a fresh context when its menu opens; retain it until the menu closes and any
   asynchronous action and host calls finish. Never keep a context alive to preserve handlers.
@@ -110,6 +112,13 @@ Two host-call flavours:
 - **Blocking** (`invokeSync`) for the synchronous Node shims only — `fs.readFileSync`,
   `execSync`, `createHash`, `gunzipSync`. Safe because Swift services these entirely on the JS queue;
   nothing there touches the main actor, so a blocking answer cannot deadlock.
+
+JavaScriptCore exposes native `Atomics` but no `SharedArrayBuffer` constructor. The runtime aliases
+`SharedArrayBuffer` to `ArrayBuffer` so dependencies can allocate their locks at module scope. Native
+atomic reads and writes still apply; `Atomics.wait` sleeps on the JS queue for a finite timeout,
+returns immediately for a mismatched value or nonpositive timeout, and rejects an indefinite wait.
+There are no worker threads to notify a waiter, so this supports synchronous sleep helpers rather
+than shared-memory coordination. If native shared buffers are available, both globals stay native.
 
 ## The Swift host
 
@@ -695,7 +704,9 @@ its preferences, keyed by `providerId`. Only a command the user opened can start
 background refresh fails until then. While the browser is up the palette hides, but Pop to Root
 Search holds off, because resetting would stop the command and cancel the sign-in. Summoning the
 palette meanwhile returns to the waiting command, and the palette comes back on its own when the
-redirect lands.
+redirect lands. Leaving the command cancels its browser session and finishes the pending host call
+without waiting for a browser callback, so the sign-in hold cannot outlive the command. A browser
+session that refuses to start fails immediately; duplicate or late callbacks cannot finish it twice.
 
 **Node built-ins** — `path`, `fs` (+ `fs/promises`, `createReadStream`/`createWriteStream`, a snapshot-backed `opendir`, and
 the descriptor calls `tar` unpacks through), `os`,

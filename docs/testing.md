@@ -51,6 +51,9 @@ through a stand-in for the hosted redirect page and confirms that a callback who
 repeated, stale or wrong is refused, for each redirect method and for custom `{ url }` requests. The
 runtime fixture suite runs both as well.
 
+`ext-test` exercises `SharedArrayBuffer` allocation at command load and finite waits in JavaScriptCore
+through the shipped synchronous host bridge.
+
 The suite runs four harnesses at a time by default to reduce CPU usage. `TINYCAST_TEST_JOBS` overrides
 that limit; `TINYCAST_TEST_JOBS=1` runs one at a time. Each result is numbered
 against the total and shows its run and compile time, a quiet stretch names the harnesses still running, and a harness that runs longer
@@ -178,6 +181,7 @@ If a change touches anything in the right column, the harness on the left is man
 | `ext-metadata-test` | `Extensions/Service/ExtensionCommandMetadataStore.swift` — round-trip, failure runs, uninstall |
 | `ext-test` | the extension runtime and native menu-bar lifecycle — boots shipped sources in JavaScriptCore; menu tests cover restoration, refresh serialization, actions and teardown; fetch tests cover HTTP connection cleanup, cancellation and request isolation |
 | `ext-icon-test` | `Extensions/Service/ExtensionIconCache.swift` — artwork sizing and its fallback |
+| `ext-sign-in-test` | `Extensions/Service/ExtensionSignInSession.swift` — browser start failures, completion, cancellation without a callback, and late callbacks after teardown |
 | `icon-cache-test` | `Platform/Images/IconCache.swift` — row sizing at 1×/2×, warm reuse, stamp and style invalidation, bitmap release, fitted geometry across all 256 alpha values, and that a row icon draws identically to the 96px one |
 | `entry-icon-test` | `EntryIcon` — that each case draws, caches and prints apart from the others, and that a moved `FileIconStamp` retires the bitmap decoded before it |
 | `text-diff-test` | `QuickActions/Model/TextDiffEngine.swift` — exact chunks, coalescing, Unicode, ties, token-cap boundaries and fast paths |
@@ -455,8 +459,10 @@ caches, TCC grants and login item, so this cannot disturb an installed copy.
   of the capsule's end, the last one never clipped at the window's edge; with Show animations off they
   appear in place. Mouse and keyboard activation open the command immediately, without a fuse,
   delayed reveal or shortcut shapes beneath the expanded panel. Show Notes opens its window
-- Compact mode: keyboard selection has a medium gray fill in Light, a brighter fill in Dark, and a white
-  monochrome glyph in both, without a ring;
+- Compact mode: arrow navigation tints the selected glass circle and uses a white monochrome glyph;
+  inspect its native contour at actual size in both appearances, without a second fill or stroke;
+  the left capsule and rightmost button must remain whole through opening, hovering, and selection,
+  and expanding/collapsing after a drag must preserve the visible bar’s top-left position;
   Emoji & Symbols uses the same outlined glyph as the launcher in both Light and Dark
 - Verify compact selection in the live glass compositor in both appearances; an offscreen view bitmap
   omits the material and cannot prove selection contrast
@@ -916,6 +922,9 @@ caches, TCC grants and login item, so this cannot disturb an installed copy.
 
 ### Extensions
 
+- Start GitHub sign-in, summon the waiting command and press Escape with an empty search field:
+  the browser session closes and root search works again. Repeat the sign-in, cancel in the browser,
+  then leave the command; closing and reopening the palette must respect Pop to Root Search again.
 - Open `raycast://extensions/linear/linear?source=webstore` from a browser: Settings → Extensions
   offers the exact Store listing with Install (or Reinstall). Close it without installing, then open
   a different Store link and verify its listing replaces the first. Repeat with extensions disabled:

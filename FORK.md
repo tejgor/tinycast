@@ -98,8 +98,9 @@ locally on one Mac. Everything in `AGENTS.md` still applies; this file only adds
   `days in`, `in 45 days`, `2h 30m`. Tested by `Tests/calc-phrases-test.swift`.
 - Pinned Calculator History entries that are answered live (`CalculatorPinStore`, `CalculatorPinning`,
   ⌘. on a card or entry). Pins live in `calculator-pins.json` and are not in backups.
-- Settings → General → Transparency thins the scrim over the launcher's (compact bar included) and
-  the note window's glass
+- Settings → General → Transparency sets how much tint (`Theme.Colors.transparencyScrim`) lies over
+  the launcher's (compact bar included) and the note window's glass. Upstream dropped its scrim for
+  bare glass, so the default is now 100% (bare, as upstream) and lower values add the tint back
   (`AppSettings.paletteTransparency`, `appearance.transparency` in `settings.json`; not in backups).
 
 ## Adding a feature without making merges painful
