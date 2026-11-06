@@ -187,9 +187,9 @@ bullets, numbers and checkboxes as `•`, `1.`, `☐`/`☑`, and writes table ro
 consecutive lines into one block, as the editor draws them, nests lists properly, escapes everything and
 renders table alignment. Copy as HTML puts both HTML and the plain rendering on the pasteboard. Export
 writes through an `NSSavePanel` sheet on the note window, since a free-standing modal would open
-beneath the floating panel. `tinycast://notes/open?id=<filename>` (`NoteDeepLink`) opens a note — after
-showing the window first if it was hidden — and `tinycast://notes` shows the window; `AppCore` offers
-every URL to the notes coordinator before the extension links.
+beneath the floating panel. `tinycast://notes/open?id=<filename>` (`NoteDeepLink`) opens a note as
+`tinycast://note/<filename>` does, and `tinycast://notes` shows the window; `DeepLinkCoordinator.open`
+routes both, under the same gate as a note link, so saved links and quicklinks keep working.
 
 ## Editor
 

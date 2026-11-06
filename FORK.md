@@ -67,6 +67,7 @@ locally on one Mac. Everything in `AGENTS.md` still applies; this file only adds
 ## Fork changes so far
 
 - Personal bundle id and `Scripts/update-fork.sh`.
+- `CLAUDE.md` stays although upstream deleted it, because it is what loads this file.
 - ⌘↑ / ⌘↓ jump between sections in ⌘K action menus (`RootPaletteView.moveMenuSection`).
 - Markdown tables in Notes render as a grid (`NoteMarkdown.Table`, `NoteTableGrid`, notes docs).
 - Claude models (the Claude Code route) search the web while Settings → AI → Web Search is on,
@@ -91,11 +92,14 @@ locally on one Mac. Everything in `AGENTS.md` still applies; this file only adds
     the old toggle over and is deleted after one release.
   - pins (⇧⌘P, ⌘1–⌘9), a browser with Pinned/Notes sections and "Opened … • N characters" rows, and a
     ⌘K action panel (`NoteActionsWindowController`) with copy/export as Markdown, HTML or plain text
-    (`NoteExport`), deeplinks (`NoteDeepLink`, `tinycast://notes/open?id=…`), duplicate and delete all.
+    (`NoteExport`), deeplinks (`NoteDeepLink`, `tinycast://notes/open?id=…`, routed by one branch in
+    `DeepLinkCoordinator.open` beside upstream's `tinycast://note/…`), duplicate and delete all.
   - Device-local Notes state lives in `NotesLocalState` (one `AppCore` line), not in `AppSettings`.
 - Calculator date phrases Raycast answers (`CalcDatePhrases`, see `docs/features/calculator.md`):
   holidays, `time until`, workday counts, spans like `3 march to 30 may`, `what day is`, week numbers,
-  `days in`, `in 45 days`, `2h 30m`. Tested by `Tests/calc-phrases-test.swift`.
+  `days in`, `in 45 days`, `2h 30m`. Tested by `Tests/calc-phrases-test.swift`. Upstream's own date
+  grammar now overlaps it: `CalcDateFacts` answers first, `CalcHolidays` keeps the holidays it knows,
+  and a span of up to 31 days reads in days as upstream's does.
 - Pinned Calculator History entries that are answered live (`CalculatorPinStore`, `CalculatorPinning`,
   ⌘. on a card or entry). Pins live in `calculator-pins.json` and are not in backups.
 - Settings → General → Transparency sets how much tint (`Theme.Colors.transparencyScrim`) lies over

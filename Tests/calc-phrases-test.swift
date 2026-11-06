@@ -85,7 +85,7 @@ struct CalcPhrasesTests {
         expect("what day is christmas", "Friday")
         expect("weekday on march 9, 2024", "Saturday")
         expect("day of the week on january 24, 1984", "Tuesday")
-        expect("week number", "Week 30", copy: "30", target: "ISO 8601")
+        expect("iso week", "Week 30", copy: "30", target: "ISO 8601")
         expect("week number on march 12, 2021", "Week 10")
         expect("days in february 2028", "29 days", source: "February 2028")
         expect("days in feb", "28 days")

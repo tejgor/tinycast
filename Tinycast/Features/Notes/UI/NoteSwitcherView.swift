@@ -107,6 +107,7 @@ struct NoteSwitcherView: View {
                                 },
                                 onCommitRename: notes.commitSwitcherRename,
                                 onCancelRename: notes.cancelSwitcherRename,
+                                onCopyLink: { notes.copyDeepLink(to: summary.id) },
                                 onTrash: { notes.trash(summary.id) },
                                 onTogglePin: { notes.togglePin(summary.id) }
                             )
@@ -182,6 +183,7 @@ private struct NoteSwitcherRow: View {
     let onBeginRename: () -> Void
     let onCommitRename: () -> Void
     let onCancelRename: () -> Void
+    let onCopyLink: () -> Void
     let onTrash: () -> Void
     let onTogglePin: () -> Void
     @State private var hovered = false
@@ -226,6 +228,7 @@ private struct NoteSwitcherRow: View {
                 rowButton(
                     title: String(localized: "Rename \(summary.displayTitle)"), symbol: "pencil",
                     action: onBeginRename)
+                rowButton(title: String(localized: "Copy Deeplink"), symbol: "link", action: onCopyLink)
                 rowButton(
                     title: String(localized: "Move \(summary.displayTitle) to Trash"), symbol: "trash",
                     action: onTrash
@@ -256,6 +259,7 @@ private struct NoteSwitcherRow: View {
             guard !editing else { return }
             onBeginRename()
         }
+        .accessibilityAction(named: "Copy Deeplink", onCopyLink)
         .accessibilityAction(named: "Move \(summary.displayTitle) to Trash") {
             guard !editing else { return }
             onTrash()

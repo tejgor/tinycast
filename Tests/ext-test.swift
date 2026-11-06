@@ -300,6 +300,21 @@ struct ExtensionTests {
             "os.loadavg returns three finite values",
             loadAverages?.count == 3
                 && loadAverages?.allSatisfy { $0.doubleValue.isFinite && $0.doubleValue >= 0 } == true)
+
+        let interfaces = value("networkInterfaces") as? [[String: Any]] ?? []
+        check(
+            "os.networkInterfaces lists the IPv4 loopback as internal",
+            interfaces.contains {
+                $0["address"] as? String == "127.0.0.1" && $0["family"] as? String == "IPv4"
+                    && $0["internal"] as? Bool == true && $0["cidr"] as? String == "127.0.0.1/8"
+            },
+            "\(interfaces)")
+        check(
+            "os.networkInterfaces never exposes a hardware address",
+            !interfaces.isEmpty && interfaces.allSatisfy { $0["mac"] as? String == "00:00:00:00:00:00" })
+        check(
+            "os.networkInterfaces gives a scope ID to IPv6 addresses only",
+            interfaces.allSatisfy { ($0["scopeid"] is NSNumber) == ($0["family"] as? String == "IPv6") })
     }
 
     @MainActor
@@ -892,6 +907,23 @@ struct ExtensionTests {
         let tiny = ExtensionDeepLink.parse(
             url: URL(string: "tinycast://extensions/linear/linear/create-issue")!)
         check("deeplink mirrors raycast:// as tinycast://", tiny == canonical)
+        let copied = ExtensionDeepLink.url(
+            extensionName: "linear/linear", commandName: "create-issue", arguments: [:], scheme: "tinycast")
+        check(
+            "a copied scoped deeplink parses back to its command",
+            copied.flatMap(ExtensionDeepLink.parse) == canonical, String(describing: copied))
+        let copiedBare = ExtensionDeepLink.url(
+            extensionName: "demo", commandName: "search", arguments: [:], scheme: "tinycast-dev")
+        check(
+            "a copied bare deeplink parses back to its command",
+            copiedBare.flatMap(ExtensionDeepLink.parse)?.extensionCandidates == ["demo"],
+            String(describing: copiedBare))
+        let typed = ["query": "a & b = c + d", "tag": "café ✓"]
+        let copiedTyped = ExtensionDeepLink.url(
+            extensionName: "demo", commandName: "search", arguments: typed, scheme: "tinycast")
+        check(
+            "a copied deeplink carries the arguments typed into the row",
+            copiedTyped.flatMap(ExtensionDeepLink.parse)?.arguments == typed, String(describing: copiedTyped))
 
         let bare = ExtensionDeepLink.parse(url: URL(string: "raycast://extensions/demo/search")!)
         check(
@@ -973,6 +1005,24 @@ struct ExtensionTests {
         check(
             "deeplink reads fallback text and background launch",
             full?.fallbackText == "hello" && full?.launchType == .background)
+
+        let expectedContext: [String: RenderValue] = [
+            "id": .string("note-1"), "pinned": .bool(true), "tags": .array([.string("a")])
+        ]
+        let encodedContext =
+            #"{"id":"note-1","pinned":true,"tags":["a"]}"#
+            .addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? ""
+        for name in ["context", "launchContext"] {
+            let withContext = ExtensionDeepLink.parse(
+                url: URL(string: "raycast://extensions/demo/search?\(name)=\(encodedContext)")!)
+            check(
+                "deeplink decodes \(name) JSON",
+                withContext?.launchContext == expectedContext,
+                String(describing: withContext?.launchContext))
+        }
+        check(
+            "deeplink treats a context that isn't an object as none",
+            ExtensionDeepLink.parseContext("[1]").isEmpty && ExtensionDeepLink.parseContext("nope").isEmpty)
 
         let legacy = ExtensionDeepLink.parse(
             url: URL(string: "com.raycast:/extensions/demo/search")!)
@@ -1161,6 +1211,9 @@ struct ExtensionTests {
               const errorCode = (callback) => {
                 try { callback(); return "none"; } catch (error) { return error.code; }
               };
+              const errorMessage = (callback) => {
+                try { callback(); return "none"; } catch (error) { return error.message; }
+              };
               const filePaths = [
                 fileURLToPath("file:///Applications/Tinycast%20Beta.app"),
                 fileURLToPath(pathToFileURL("/tmp/a#b.png")),
@@ -1183,6 +1236,22 @@ struct ExtensionTests {
               const encrypted = Buffer.concat([encrypter.update("hello tinycast"), encrypter.final()]);
               const decrypter = crypto.createDecipheriv("aes-256-cbc", "k".repeat(32), Buffer.from("i".repeat(16)));
               const ecb = crypto.createCipheriv("aes-128-ecb", Buffer.alloc(16, 1), null).setAutoPadding(false);
+              const gcmKey = Buffer.alloc(32, 7);
+              const gcmSeal = (iv, aad) => {
+                const cipher = crypto.createCipheriv("aes-256-gcm", gcmKey, iv);
+                if (aad) cipher.setAAD(aad);
+                const ciphertext = Buffer.concat([cipher.update("hello gcm"), cipher.final()]);
+                return { ciphertext, tag: cipher.getAuthTag() };
+              };
+              const gcmOpen = (iv, sealed, aad) => {
+                const decipher = crypto.createDecipheriv("aes-256-gcm", gcmKey, iv);
+                if (aad) decipher.setAAD(aad);
+                decipher.setAuthTag(sealed.tag);
+                return Buffer.concat([decipher.update(sealed.ciphertext), decipher.final()]).toString("utf8");
+              };
+              const shortNonce = gcmSeal(Buffer.from("gcm-nonce-12"));
+              // A 16-byte nonce proves CryptoKit derives a long GCM nonce the way Node does.
+              const longNonce = gcmSeal(Buffer.alloc(16, 9), Buffer.from("header"));
               const cipherShim = [
                 crypto.pbkdf2Sync("password", "salt", 1000, 16, "sha512").toString("hex"),
                 crypto.pbkdf2Sync("", "", 1, 8, "SHA-256").toString("hex"),
@@ -1197,6 +1266,10 @@ struct ExtensionTests {
                 }),
                 errorCode(() => crypto.createCipheriv("aes-256-cbc", "short", "i".repeat(16))),
                 errorCode(() => crypto.pbkdf2Sync("p", "s", 1, 8, "nope")),
+                shortNonce.tag.toString("hex") + ":" + shortNonce.ciphertext.toString("hex"),
+                longNonce.tag.toString("hex") + ":" + longNonce.ciphertext.toString("hex"),
+                gcmOpen(Buffer.alloc(16, 9), longNonce, Buffer.from("header")),
+                errorMessage(() => gcmOpen(Buffer.alloc(16, 9), longNonce)),
                 derived,
               ].join(",");
               return h(List, { navigationTitle: "Synthetic", isLoading: false },
@@ -1269,13 +1342,16 @@ struct ExtensionTests {
                 + "ERR_INVALID_URL_SCHEME",
             String(describing: screen.items.first?.node.array("accessories").dropFirst(2).first))
         check(
-            "crypto shim derives PBKDF2 keys and round-trips AES like Node",
+            "crypto shim derives PBKDF2 keys, round-trips AES and authenticates GCM like Node",
             ExtensionAccessoriesView_labelForTest(
                 screen.items.first?.node.array("accessories").dropFirst(4).first)
                 == "afe6c5530785b6cc6b1c6453384731bd,f7ce0b653d2d72a4,5d11c49af18b4b3e482508362bd2c857,"
                 + "eb7b227687302ff167fef6a04d9f99f3,"
                 + "hello tinycast,17d614f379a9359077e95577fd31c20a,ERR_OSSL_BAD_DECRYPT,"
-                + "ERR_CRYPTO_INVALID_KEYLEN,ERR_CRYPTO_INVALID_DIGEST,6cba6dd1d44f53a3",
+                + "ERR_CRYPTO_INVALID_KEYLEN,ERR_CRYPTO_INVALID_DIGEST,"
+                + "875a7af65e66ba29298577f2c937c48b:589dd2d6d2696c5310,"
+                + "749e7f715a23139cbfa9b3259ab594e1:aaefe159005653143a,hello gcm,"
+                + "Unsupported state or unable to authenticate data,6cba6dd1d44f53a3",
             String(describing: screen.items.first?.node.array("accessories").dropFirst(4).first))
         check(
             "util shim answers debuglog, stripVTControlCharacters, aborted and inspect.custom",
@@ -1423,6 +1499,7 @@ struct ExtensionTests {
 
         await swiftHelperChecks()
         await processKillChecks()
+        await stdioDescriptorChecks()
         zlibChecks()
     }
 
@@ -1936,6 +2013,61 @@ struct ExtensionTests {
                 == "true,failed,false,EPERM,ESRCH,ERR_UNKNOWN_SIGNAL",
             recorder.trees.last?.activeRoot?.string("markdown") ?? "no tree")
         await runtime.stop(session: "sKill")
+    }
+
+    @MainActor
+    static func stdioDescriptorChecks() async {
+        let file = FileManager.default.temporaryDirectory
+            .appendingPathComponent("tinycast-stdio-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: file) }
+
+        let (runtime, _, recorder) = makeRuntime()
+        try? await runtime.boot(
+            config: .current(supportDirectory: FileManager.default.temporaryDirectory))
+        let command = """
+            "use strict";
+            const { Detail } = require("@raycast/api");
+            const React = require("react");
+            const fs = require("fs");
+            const { spawn, spawnSync } = require("child_process");
+            const run = (file, args, stdio) => new Promise((resolve) => {
+              const child = spawn(file, args, { stdio });
+              let out = "";
+              child.stdout.on("data", (chunk) => (out += chunk));
+              child.on("close", (code) => resolve(code + ":" + out.trim()));
+            });
+            module.exports.default = function Command() {
+              const [state, setState] = React.useState("pending");
+              React.useEffect(() => {
+                (async () => {
+                  const output = fs.openSync("\(file.path)", "wx");
+                  const wrote = await run("/bin/echo", ["hello"], ["ignore", output, "pipe"]);
+                  fs.closeSync(output);
+                  const input = fs.openSync("\(file.path)", "r");
+                  const read = await run("/bin/cat", [], [input, "pipe", "pipe"]);
+                  fs.closeSync(input);
+                  const syncInput = fs.openSync("\(file.path)", "r");
+                  const sync = spawnSync("/bin/cat", [], { stdio: [syncInput, "pipe", "pipe"] });
+                  fs.closeSync(syncInput);
+                  setState([wrote, read, sync.stdout.toString().trim()].join(","));
+                })().catch((error) => setState("threw:" + error.message));
+              }, []);
+              return React.createElement(Detail, { markdown: state });
+            };
+            """
+        await runtime.start(
+            session: "sStdio", code: command, file: URL(fileURLWithPath: "/tmp/stdio-descriptors.js"),
+            mode: .view, context: launchContext())
+        await settle(until: { recorder.trees.last?.activeRoot?.string("markdown") == "0:,0:hello,hello" })
+
+        check(
+            "a stdout descriptor receives the child's output",
+            (try? String(contentsOf: file, encoding: .utf8)) == "hello\n")
+        check(
+            "a stdin descriptor feeds spawn and spawnSync",
+            recorder.trees.last?.activeRoot?.string("markdown") == "0:,0:hello,hello",
+            recorder.trees.last?.activeRoot?.string("markdown") ?? "no tree")
+        await runtime.stop(session: "sStdio")
     }
 
     /// `zlib` is the one node shim with no JS-side implementation to lean on.

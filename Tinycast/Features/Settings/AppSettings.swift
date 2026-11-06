@@ -635,6 +635,16 @@ final class AppSettings {
         didSet { defaults.set(windowCycle.rawValue, forKey: Key.windowCycle.rawValue) }
     }
 
+    var windowWrapsDisplays: Bool {
+        didSet { defaults.set(windowWrapsDisplays, forKey: Key.windowWrapsDisplays.rawValue) }
+    }
+
+    var windowKeepsProportions: Bool {
+        didSet {
+            defaults.set(windowKeepsProportions, forKey: Key.windowKeepsProportions.rawValue)
+        }
+    }
+
     /// Off means fully off, down to a still-registered shortcut opening nothing.
     var quicklinksEnabled: Bool {
         didSet { defaults.set(quicklinksEnabled, forKey: Key.quicklinksEnabled.rawValue) }
@@ -680,6 +690,11 @@ final class AppSettings {
     /// Whether settings.json mirrors these settings; `AppCore` starts and stops the mirror.
     var settingsFileEnabled: Bool {
         didSet { defaults.set(settingsFileEnabled, forKey: Key.settingsFileEnabled.rawValue) }
+    }
+
+    /// Rows a link from outside may run without asking; only `DeepLinkCoordinator` adds to it.
+    var allowedDeepLinks: [String] {
+        didSet { defaults.set(allowedDeepLinks, forKey: Key.allowedDeepLinks.rawValue) }
     }
 
     /// With no per-app list the bundle follows macOS's languages, so this runs before any lookup.
@@ -905,6 +920,12 @@ final class AppSettings {
         windowGap = defaults.integer(forKey: Key.windowGap.rawValue)
         windowCycle =
             defaults.string(forKey: Key.windowCycle.rawValue).flatMap(WindowCycle.init) ?? .off
+        windowWrapsDisplays =
+            defaults.object(forKey: Key.windowWrapsDisplays.rawValue) == nil
+            || defaults.bool(forKey: Key.windowWrapsDisplays.rawValue)
+        windowKeepsProportions =
+            defaults.object(forKey: Key.windowKeepsProportions.rawValue) == nil
+            || defaults.bool(forKey: Key.windowKeepsProportions.rawValue)
         windowLayoutsShowInLauncher =
             defaults.object(forKey: Key.windowLayoutsShowInLauncher.rawValue) == nil
             || defaults.bool(forKey: Key.windowLayoutsShowInLauncher.rawValue)
@@ -926,5 +947,6 @@ final class AppSettings {
             defaults.object(forKey: Key.supportReminders.rawValue) == nil
             || defaults.bool(forKey: Key.supportReminders.rawValue)
         settingsFileEnabled = defaults.bool(forKey: Key.settingsFileEnabled.rawValue)
+        allowedDeepLinks = defaults.stringArray(forKey: Key.allowedDeepLinks.rawValue) ?? []
     }
 }

@@ -4,10 +4,11 @@ import SwiftUI
 @MainActor
 @Observable
 final class NotesCoordinator {
-    private enum Presentation {
+    private enum Presentation: Equatable {
         case editor
-        case create
+        case create(source: String)
         case search
+        case note(NoteID)
     }
 
     private let store: NotesStore
@@ -46,8 +47,6 @@ final class NotesCoordinator {
     @ObservationIgnored private var history = NoteHistory()
     @ObservationIgnored private var countCache: [NoteID: (modified: Date, count: Int)] = [:]
     private(set) var noteCounts: [NoteID: Int] = [:]
-    /// A deeplink that arrived while the window was hidden, opened once the editor shows.
-    @ObservationIgnored private var pendingLinkedNote: NoteID?
     private var presentationGeneration = 0
 
     @ObservationIgnored private let saveFormattingBarExpanded: @Sendable (Bool) -> Void
@@ -279,22 +278,13 @@ final class NotesCoordinator {
 
     // MARK: - Deeplinks
 
-    /// True for any notes link, handled or not, so no other handler reads it as its own.
-    func handleDeepLink(_ url: URL) -> Bool {
-        guard let route = NoteDeepLink.route(url) else { return false }
-        guard settings.notesEnabled else { return true }
+    func open(_ route: NoteDeepLink.Route) {
         switch route {
         case .show:
             if !windowController.isVisible { request(.editor) }
         case .open(let id):
-            if windowController.isVisible, store.isLoaded {
-                select(id)
-            } else {
-                pendingLinkedNote = id
-                request(.editor)
-            }
+            open(id)
         }
-        return true
     }
 
     // MARK: - Copy and export
@@ -415,11 +405,23 @@ final class NotesCoordinator {
     }
 
     func createNote() {
-        request(.create)
+        createNote(text: "")
+    }
+
+    func createNote(text: String) {
+        request(.create(source: text))
     }
 
     func searchNotes() {
         request(.search)
+    }
+
+    func open(_ id: NoteID) {
+        request(.note(id))
+    }
+
+    func copyDeepLink(to id: NoteID) {
+        core.deepLinkCoordinator.copyLink(toNote: id)
     }
 
     func openSwitcher() {
@@ -735,7 +737,12 @@ final class NotesCoordinator {
         loadTask = Task { [weak self] in
             guard let self else { return }
             // Create is its own load: the collection it would wait for is the one it adds to.
-            let loaded = presentation == .create ? await store.create() : await store.start()
+            let loaded =
+                if case .create(let source) = presentation {
+                    await store.create(source: source)
+                } else {
+                    await store.start()
+                }
             guard generation == enablementGeneration else {
                 if !settings.notesEnabled { store.stop() }
                 return
@@ -743,7 +750,9 @@ final class NotesCoordinator {
             loadTask = nil
             guard loaded, settings.notesEnabled, !Task.isCancelled else { return }
             // The note this task just made satisfies a create still pending; never make a second.
-            if presentation == .create, pendingPresentation == .create {
+            if case .create = presentation,
+                pendingPresentation == presentation || pendingPresentation == .create(source: "")
+            {
                 pendingPresentation = .editor
             }
             guard let next = pendingPresentation else { return }
@@ -757,22 +766,25 @@ final class NotesCoordinator {
         case .editor:
             closeSwitcher()
             windowController.show(focusEditor: true)
-            if let linked = pendingLinkedNote {
-                pendingLinkedNote = nil
-                select(linked)
-            }
-        case .create:
-            let generation = presentationGeneration
-            guard await store.create(), settings.notesEnabled, !Task.isCancelled,
-                generation == presentationGeneration
-            else { return }
-            closeSwitcher()
-            windowController.show(focusEditor: true)
+        case .create(let source):
+            await showEditor { await store.create(source: source) }
+        case .note(let id):
+            await showEditor { await store.select(id) }
         case .search:
             // The switcher hangs off the note window, so that window has to exist first.
             windowController.show(focusEditor: false)
             openSwitcher()
         }
+    }
+
+    /// Shown only if the change landed and no newer show or hide claimed the window meanwhile.
+    private func showEditor(after change: () async -> Bool) async {
+        let generation = presentationGeneration
+        guard await change(), settings.notesEnabled, !Task.isCancelled,
+            generation == presentationGeneration
+        else { return }
+        closeSwitcher()
+        windowController.show(focusEditor: true)
     }
 
     /// A newer show or hide retires an older operation's right to put what it loaded on screen.

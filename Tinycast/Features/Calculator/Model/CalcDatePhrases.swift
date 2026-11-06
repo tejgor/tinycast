@@ -317,10 +317,12 @@ enum CalcDatePhrases {
                     calendar: calendar), "workday")
         case .some: return nil
         case nil:
+            let total = days(from: first, to: last, calendar: calendar)
+            // Upstream reads a span of a month or less in days; only a longer one breaks down.
             display =
                 hasTime
                 ? CalcFormatter.timespan(last.timeIntervalSince(first))
-                : breakdown(from: first, to: last, calendar: calendar)
+                : total <= 31 ? count(total, "day") : breakdown(from: first, to: last, calendar: calendar)
         }
         return result(display, from: start.date, to: end.date, hasTime: hasTime, now: now, calendar: calendar)
     }
@@ -491,6 +493,8 @@ enum CalcDatePhrases {
         var padded = " \(text) "
         // A lone name stays a search, as a lone `christmas` does; a year or a grammar earns a card.
         guard !holidays.contains(where: { padded == " \($0.name) " }) else { return text }
+        // `CalcHolidays` answers the names it knows, and only it notes a moon sighting's ±1 day.
+        guard CalcDateTime.evaluate(text, now: now, calendar: calendar) == nil else { return text }
         let past =
             padded.contains(" since ") || padded.hasSuffix(" ago ") || padded.contains(" was ")
             || padded.hasPrefix(" last ")
@@ -574,6 +578,8 @@ enum CalcDatePhrases {
     // MARK: - Helpers
 
     private static func rangeMoment(_ phrase: String, now: Date, calendar: Calendar) -> CalcDateTime.ResolvedMoment? {
+        // A lone slash is a fraction upstream, so `5/2 to 1/2` is no span.
+        guard phrase.count(where: { $0 == "/" }) != 1 else { return nil }
         if isYear(phrase), let year = Int(phrase),
             let date = calendar.date(from: DateComponents(year: year, month: 1, day: 1))
         {
