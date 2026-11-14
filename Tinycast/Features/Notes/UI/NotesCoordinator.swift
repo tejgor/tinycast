@@ -28,6 +28,7 @@ final class NotesCoordinator {
     @ObservationIgnored private var loadTask: Task<Void, Never>?
     @ObservationIgnored private var issueTask: Task<Void, Never>?
     @ObservationIgnored private var operationTask: Task<Void, Never>?
+    @ObservationIgnored private var wordCountTask: Task<Void, Never>?
     @ObservationIgnored private var operationID = 0
     @ObservationIgnored private var pendingIssue: NotesStore.Issue?
     private var pendingPresentation: Presentation?
@@ -36,6 +37,7 @@ final class NotesCoordinator {
     private(set) var switcherSelection: NoteID?
     private(set) var switcherFocusRevision = 0
     private(set) var characterCount = 0
+    private(set) var wordCount = 0
     private(set) var formatting = NoteFormatting.plain
     private(set) var isFormattingBarExpanded: Bool
     private(set) var isHeadingMenuPresented = false
@@ -82,15 +84,10 @@ final class NotesCoordinator {
     var hasActiveNote: Bool { store.activeID != nil }
     /// UTF-16 units, straight off the text storage: the only length TextKit hands back in O(1).
     var characterCountLabel: String {
-        guard local.countsWords else { return String(localized: "\(characterCount) characters") }
-        // Markdown markers such as `-` and `[ ]` hold no letter or digit, so they are not words.
-        let words = store.source.split(whereSeparator: \.isWhitespace)
-            .count { $0.contains { $0.isLetter || $0.isNumber } }
-        return String(localized: "\(words) words")
+        String(localized: "\(characterCount) characters")
     }
-
-    func toggleCountMode() {
-        local.countsWords.toggle()
+    var wordCountLabel: String {
+        String(localized: "\(wordCount) words")
     }
 
     var zoom: CGFloat { CGFloat(local.zoom) }
@@ -666,9 +663,15 @@ final class NotesCoordinator {
         store.updateSource(source)
     }
 
-    func updateCharacterCount(_ input: NoteEditorInput, _ count: Int) {
+    func updateCounts(_ input: NoteEditorInput, _ characterCount: Int) {
         guard input == editorInput else { return }
-        characterCount = count
+        self.characterCount = characterCount
+        wordCountTask?.cancel()
+        wordCountTask = Task { [weak self] in
+            let wordCount = await NoteWordCount.count(in: input.source)
+            guard let self, !Task.isCancelled, input == editorInput else { return }
+            self.wordCount = wordCount
+        }
     }
 
     /// Id and epoch, not the whole input: comparing a long source on every caret move is not free.

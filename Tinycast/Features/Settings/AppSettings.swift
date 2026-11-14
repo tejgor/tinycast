@@ -249,7 +249,7 @@ final class AppSettings {
         didSet { defaults.set(compactMode, forKey: Key.compactMode.rawValue) }
     }
 
-    /// Percent of the scrim taken off the launcher's glass: 0 is the full tint, 100 (default) bare glass.
+    /// Percent of the scrim taken off the launcher's glass: 0 (default) is the full tint, 100 bare glass.
     var paletteTransparency: Int {
         didSet { defaults.set(paletteTransparency, forKey: Key.paletteTransparency.rawValue) }
     }
@@ -465,6 +465,10 @@ final class AppSettings {
     /// The snippets folder as the user wrote it, `~` allowed; nil keeps it in Application Support.
     var snippetsFolder: String? {
         didSet { defaults.set(snippetsFolder, forKey: Key.snippetsFolder.rawValue) }
+    }
+
+    var snippetDefaultAction: SnippetDefaultAction {
+        didSet { defaults.set(snippetDefaultAction.rawValue, forKey: Key.snippetDefaultAction.rawValue) }
     }
 
     var navigationEnabled: Bool {
@@ -772,7 +776,7 @@ final class AppSettings {
             || defaults.bool(forKey: Key.compactMode.rawValue)
         paletteTransparency =
             defaults.object(forKey: Key.paletteTransparency.rawValue) == nil
-            ? 100 : min(max(defaults.integer(forKey: Key.paletteTransparency.rawValue), 0), 100)
+            ? 0 : min(max(defaults.integer(forKey: Key.paletteTransparency.rawValue), 0), 100)
         compactBarCommands =
             defaults.stringArray(forKey: Key.compactBarCommands.rawValue)
             .flatMap(CommandID.compactBarCommands(from:)) ?? CommandID.defaultCompactBarCommands
@@ -860,6 +864,9 @@ final class AppSettings {
             defaults.object(forKey: Key.snippetsShowInLauncher.rawValue) == nil
             || defaults.bool(forKey: Key.snippetsShowInLauncher.rawValue)
         snippetsFolder = defaults.string(forKey: Key.snippetsFolder.rawValue)
+        snippetDefaultAction =
+            defaults.string(forKey: Key.snippetDefaultAction.rawValue)
+            .flatMap(SnippetDefaultAction.init) ?? .paste
         // Opt-in, unlike its siblings: until it is asked for, nothing about extensions is loaded.
         extensionsEnabled = defaults.bool(forKey: Key.extensionsEnabled.rawValue)
         extensionsShowInLauncher =

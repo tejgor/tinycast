@@ -2,14 +2,14 @@
 
 `Features/Calculator/Model/` is a **Foundation-only** engine (no AppKit / SwiftUI imports) fronted by
 `CalcMemo`, a one-deep memo mirroring `AppIndex`'s. It must stay Foundation-only because the
-`Tests/calc-test.swift` harness compiles the real engine sources — including `CalcDateTime`. It is
+`Tests/CalcTests.swift` harness compiles the real engine sources — including `CalcDateTime`. It is
 also **pure**: the inputs it can't compute — the FX rate table and the Mac's own currency — are passed
 in (see Currency below).
 
 ## Invariants
 
 - **`Model/` (including `CalcDateTime`) stays Foundation-only *and pure*** — no AppKit or SwiftUI, no
-  clock read, no network, **no `Locale`**. `calc-test` compiles the real engine sources. Every
+  clock read, no network, **no `Locale`**. `CalcTests` compiles the real engine sources. Every
   externally-sourced input is injected: the clock via `now`/`calendar`, the FX table via `rates`,
   the Mac's own currency via `region`, which `RegionCurrency` reads and `CalcMemo` passes down, and
   the number format via `format`, which `RegionNumberFormatMonitor` reads from Language & Region.
@@ -76,7 +76,7 @@ so `what is the time in tokyo` still reaches the zone grammar.
 6. **Typed quantity arithmetic** (`10kg + 500g`, `$10 + €5`, `5m * 4m`,
    `100km / 2h to km/h`, `(1hr + 30min) to timespan`)
 7. Explicit unit conversion (`10km to mi`, `m to ft`, `day s`)
-8. Currency conversion (`1 euro to dollars`, `€20 to GBP`, `1 btc to eur`)
+8. Currency conversion (`1 euro to dollars`, `€20 to GBP`, `1 btc to eur`, `100 usd nzd`)
 9. Bare-unit auto-conversion (`1m` → feet + inches, `1hr` → 60 min)
 10. Natural-language percent, ratio and list forms (`CalcPercent`)
 11. Rounding and fraction phrases (`CalcRounding`: `1/3 to 2 dp`, `0.75 as fraction`)
@@ -468,7 +468,7 @@ destination keeps its meaning: `5pm in SF` still converts from the Mac's zone to
 
 The source is the Mac's own zone unless the query names one, which is what makes `5pm london in sf`
 work without either side being local. That zone comes from the **injected calendar**, so `Model/`
-performs no environment read and `calc-test` pins UTC exactly as it pins the clock. A result that
+performs no environment read and `CalcTests` pins UTC exactly as it pins the clock. A result that
 lands on another date is suffixed `(tomorrow)` / `(yesterday)`, or `(in 2 days)` / `(2 days ago)`
 for a two-date jump across the date line. The difference compares the source and target calendar
 dates; the copyable text stays the bare time.
@@ -509,7 +509,7 @@ one that does not resolve silences the whole list. Two to six places qualify.
 
 The dated, span and list forms live in `CalcZoneSchedule`, an extension of `CalcTimeZone`. Each is
 gated before it allocates — a comma, or a colon or am/pm after a digit — so a query with none of those
-costs nothing on its way past; `calc-performance` shows no change for units, currency or arithmetic.
+costs nothing on its way past; `CalcPerformanceTests` shows no change for units, currency or arithmetic.
 
 `date in tokyo` and `tokyo date` answer today's date there. `local time in tokyo`, `tokyo local time`,
 `time now in tokyo` and `time in tokyo now` drop their filler word and ask `time in tokyo`; the filler is
@@ -631,7 +631,7 @@ that file (`resolveMoment`, `answerText`, …) rather than by widening upstream'
   `chinese`, `islamicUmmAlQura` and `hebrew` calendars. Nothing reads EventKit, and workday counts still
   skip only weekends. A holiday name alone stays a search, like any lone date word.
 - **Cost**: a word gate (`mayBeDatePhrase`) lets an app search leave after one pass; the measured
-  overhead is a few microseconds per keystroke. `Tests/calc-phrases-test.swift` covers it.
+  overhead is a few microseconds per keystroke. `Tests/CalcPhrasesTests.swift` covers it.
 - Subtraction keeps upstream's meaning, so `jan 10 - feb 5` stays `-26 days`; `jan 10 to feb 5` is the
   span.
 
@@ -707,8 +707,8 @@ parser, so an amount keeps its money or unit: `25% off $60` is `45.00 USD`.
 - `$50/hr for 3 hours` → `150.00 USD`, `60 km/h for 30 min` → `30 km`, `download 20 GB at 10 MB/s` →
   `33 min 20 s`, `1 hour at 2x` → `0.5 hr`, `time saved 1 hour at 1.5x`, and `$50/hr is what per day` →
   `1,200.00 USD/day` (`CalcRatePhrases`)
-- Worded conversions (`CalcQuestion`): `convert 5 km into miles`, `5 km is what in miles`,
-  `5 km is how many miles`, `how many feet in a mile`, `seconds in 3 days`, `exchange rate for usd to
+- Worded conversions (`CalcQuestion`): `convert 5 km into miles`, `convert 100 usd eur`,
+  `5 km is what in miles`, `5 km is how many miles`, `how many feet in a mile`, `seconds in 3 days`, `exchange rate for usd to
   eur`. A unit asked about needs an amount or `a` / `an` after `in`, so `m in ft` keeps meaning one metre
 - Number forms (`CalcNumberForm`): `1234567 to sci` → `1.234567e6` (which reads back as the same
   number), `51.4772° to dms` → `51° 28′ 37.92″`, `5400 s to hms` → `1h 30m 0s`, `75.5 s to laptime` →
@@ -769,6 +769,11 @@ echoes the typed text (`10km to mi ×`) rather than the conversion's own shorten
 `CalcCurrency` mirrors `CalcUnits`' shape: a lookup table plus a `parseConversion` over the same
 `expr from (to|in|->) to` token shape, so `eur to usd` implies an amount of 1 exactly like `m to ft`.
 A leading sign is swapped back into amount-first order, so `€20 to GBP` and `20€ to GBP` parse alike.
+The connector may be dropped (`100 usd nzd`) only behind an amount: lowercase codes double as words,
+so `try all` stays an app search, and without a connector a side that is only a unit gets no card.
+A currency pair also outranks a typed-arithmetic error. Typed arithmetic reads `100/4 usd to eur` as
+`100 / (4 usd)` and `-5 pounds to eur` as weight; the pair reads 25 USD, and pounds sterling as
+`5 pounds to eur` already does. A unit-only side keeps its error: `10 lb to gbp` cannot convert.
 
 The table is **generated except for the judgement calls**. `node Scripts/gen-currencies.js` joins three
 sources on the ISO code and emits `CurrencyData.generated.swift`:
@@ -868,6 +873,10 @@ The fetch runs on a private **cacheless** `URLSession` (`.ephemeral`, `urlCache 
 `Cache-Control: public, max-age=…`, so the shared session would keep a second copy in the on-disk
 `URLCache` that deleting the snapshot doesn't touch.
 
+Both feeds are served by the website's Worker at `tinycast.dev/api/v1/currencies`, which reshapes the
+CC0 [exchange-api](https://github.com/fawazahmed0/exchange-api) daily snapshot and edge-caches it
+(see `website/worker/currencies.ts`).
+
 Rates come from `CurrencyRateStore` (`Calculator/Service/`, owned by `AppCore`), which issues two
 requests concurrently: the fiat table, keyed `<base><code>` with the base's own row omitted, and the
 coin table, which quotes the **inverse** — one coin priced in the base. `CurrencyFeed` folds both
@@ -926,14 +935,19 @@ conversion's echo drops its target (`10km to mi` records `10 km`). Pins are not 
 ## Number format
 
 General ▸ Calculator ▸ Number format is `System` by default, reading the decimal and grouping
-separators from Language & Region, or `English`, which is the canonical syntax itself. A decimal
-separator other than `.` or `,` (the Arabic `٫`) falls back to English, and so does any grouping
-separator outside `. , ' ’` and the no-break spaces — an ordinary space is never grouping, so
-`1hr 30` and `5 feet 3 inches` keep their meaning. `RegionNumberFormatMonitor` re-reads on
+separators, and the grouping widths, from Language & Region, or `English`, which is the canonical
+syntax itself. A decimal separator other than `.` or `,` (the Arabic `٫`) falls back to English, and
+so does any grouping separator outside `. , ' ’` and the no-break spaces — an ordinary space is
+never grouping, so `1hr 30` and `5 feet 3 inches` keep their meaning. India's widths come with them,
+so a lakh renders `1,00,000` rather than `100,000` — but only with `.` and `,`, the one pair whose
+input reads any grouping back. Any other pair keeps threes, so `2.000.000` still types back in.
+`RegionNumberFormatMonitor` re-reads on
 `NSLocale.currentLocaleDidChangeNotification`, so a change in System Settings applies without a relaunch.
 
 `CalcNumberFormat.canonical` scans each run of digits and the separators between them, and rewrites
-it to canonical spelling or rejects the whole query. Rejection means **no card**, never a guess:
+it to canonical spelling or rejects the whole query. Rejection means **no card**, never a guess. A
+region that writes `.` and `,` — India included — reads input exactly as `English` does, and only
+its answers are re-grouped, so nothing it already answers stops answering:
 
 - **A decimal comma owns every comma between two digits.** `2,3 + 1,5` is `3,8` and `max(2,3)` is
   `max(2.3)`. Function arguments and list items are separated by `;` instead — `max(2,5; 3)`,
@@ -958,8 +972,9 @@ it to canonical spelling or rejects the whole query. Rejection means **no card**
   space) is the canonical decimal, so `1.5 + 1` answers `2,5`.
 
 `CalcNumberFormat.localized` is the reverse, applied to canonical text: a run that is one valid
-canonical number takes the format's separators, and anything else — a dotted date, a version, a
-clock, a date formatter's `Friday, 24 July` — is left as written. Inside a function call every comma
+canonical number is re-grouped in the format's own widths and takes its separators — India reads the
+canonical `2,000,000` back as `20,00,000` — and anything else — a dotted date, a version, a clock, a
+date formatter's `Friday, 24 July` — is left as written. Inside a function call every comma
 is an argument, as `CalcTokenizer` reads it, so a stored `max(1,234)` shows `max(1;234)`, never
 `max(1.234)`. The echoed expression additionally turns its canonical argument commas into `;`. `English` makes both directions the identity, so the
 English path is byte-for-byte what it was.

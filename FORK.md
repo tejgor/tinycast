@@ -59,6 +59,10 @@ locally on one Mac. Everything in `AGENTS.md` still applies; this file only adds
 - Release builds use bundle id `com.tinycast.app.personal` (set in `project.yml`). Any id other than
   upstream's stable or beta one resolves to `ReleaseChannel.development`, which is what keeps the
   built-in updater from replacing this fork with an upstream release. Do not change it back.
+- Upstream moved to `com.abueammar.tinycast` (`BundleIdentifierMigration`), which only touches ids
+  under that prefix, so it leaves this one alone. Two lines keep the old id working: one in
+  `AppPaths.configFolderName` keeps the `tinycast-personal` settings folder, and one in
+  `AppIndex.suggestions` keeps the running app out of its own suggestions.
 - Signed with the self-signed `Tinycast Self-Signed` identity in the login keychain (`docs/signing.md`).
   Keeping the identity and bundle id fixed keeps macOS permissions across rebuilds.
 - Data lives under `~/Library/Application Support/com.tinycast.app.personal/` (notes in `Notes/`),
@@ -86,7 +90,8 @@ locally on one Mac. Everything in `AGENTS.md` still applies; this file only adds
   - a hand-sized window keeps its size (`NotesLocalState.autoSizesWindow`), and planned edits such as
     Return in a list scroll the caret into view;
   - ⌘L link, ⇧⌘S strikethrough, ⌘↵ checkbox, ⌘[ / ⌘] history (`NoteHistory`), ⌘+ / ⌘− / ⌘0 zoom,
-    a character/word count toggle, Duplicate Note, Delete All Notes;
+    Duplicate Note, Delete All Notes (the fork's click-to-toggle count gave way to upstream's
+    footer, which shows words and characters together);
   - Settings → Notes → Escape Key Loses Focus (fork-only, not in backups). The fork's Show Notes
     Button in Menu Bar gave way to upstream's Show in Menu Bar; `NotesMenuBarButtonMigration` carries
     the old toggle over and is deleted after one release.
@@ -97,15 +102,15 @@ locally on one Mac. Everything in `AGENTS.md` still applies; this file only adds
   - Device-local Notes state lives in `NotesLocalState` (one `AppCore` line), not in `AppSettings`.
 - Calculator date phrases Raycast answers (`CalcDatePhrases`, see `docs/features/calculator.md`):
   holidays, `time until`, workday counts, spans like `3 march to 30 may`, `what day is`, week numbers,
-  `days in`, `in 45 days`, `2h 30m`. Tested by `Tests/calc-phrases-test.swift`. Upstream's own date
+  `days in`, `in 45 days`, `2h 30m`. Tested by `Tests/CalcPhrasesTests.swift`. Upstream's own date
   grammar now overlaps it: `CalcDateFacts` answers first, `CalcHolidays` keeps the holidays it knows,
   and a span of up to 31 days reads in days as upstream's does.
 - Pinned Calculator History entries that are answered live (`CalculatorPinStore`, `CalculatorPinning`,
   ⌘. on a card or entry). Pins live in `calculator-pins.json` and are not in backups.
-- Settings → General → Transparency sets how much tint (`Theme.Colors.transparencyScrim`) lies over
-  the launcher's (compact bar included) and the note window's glass. Upstream dropped its scrim for
-  bare glass, so the default is now 100% (bare, as upstream) and lower values add the tint back
-  (`AppSettings.paletteTransparency`, `appearance.transparency` in `settings.json`; not in backups).
+- Settings → General → Transparency thins upstream's `Theme.Colors.panelScrim` over the launcher's
+  (compact bar included) and the note window's glass: 0% (default) is upstream's full tint, 100% bare
+  glass (`AppSettings.paletteTransparency`, `appearance.transparency` in `settings.json`; not in
+  backups).
 
 ## Adding a feature without making merges painful
 

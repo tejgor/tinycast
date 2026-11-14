@@ -9,7 +9,7 @@ struct NotesView: View {
             content
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Theme.Colors.transparencyScrim.opacity(notes.scrimOpacity))
+        .background(Theme.Colors.panelScrim.opacity(notes.scrimOpacity))
         .background(GlassEffectView())
         .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.panel, style: .continuous))
         // The band above is the title bar; AppKit must not inset the content a second time.
@@ -19,11 +19,10 @@ struct NotesView: View {
         }
     }
 
-    /// The hosting view hides the real title bar, so this band drags the window itself.
+    /// Lies over the real title bar and leaves its presses alone, so the system drags the window.
     private var titleBar: some View {
         HStack(spacing: 0) {
             Color.clear
-                .contentShape(Rectangle())
                 .overlay { NoteTitlebarDragRegion(onDoubleClick: notes.moveToTopRight) }
             NoteTitlebarActions()
         }
@@ -55,7 +54,7 @@ struct NotesView: View {
                 input: notes.editorInput,
                 rendersMarkdown: notes.rendersMarkdown,
                 onSourceChange: notes.updateSource,
-                onCharacterCountChange: notes.updateCharacterCount,
+                onCharacterCountChange: notes.updateCounts,
                 onFormattingChange: notes.updateFormatting,
                 onReady: notes.editorReady,
                 zoom: notes.zoom
@@ -72,7 +71,7 @@ struct NotesView: View {
     private var formattingBand: some View {
         HStack(spacing: Theme.Spacing.md) {
             ViewThatFits(in: .horizontal) {
-                characterCount
+                counts
                 Color.clear.frame(width: 0, height: 0)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -103,25 +102,23 @@ struct NotesView: View {
     }
 
     private var footer: some View {
-        characterCount
+        counts
             .frame(maxWidth: .infinity)
             .frame(height: Theme.Size.noteFooterHeight)
     }
 
-    /// A click switches between characters and words, as Raycast's counter does.
-    private var characterCount: some View {
-        Button(action: notes.toggleCountMode) {
+    private var counts: some View {
+        HStack(spacing: Theme.Spacing.xs) {
+            Text(notes.wordCountLabel)
+                .accessibilityLabel("\(notes.wordCount) words in this note")
+            Text(verbatim: "·")
+                .accessibilityHidden(true)
             Text(notes.characterCountLabel)
-                .font(Theme.Typography.rowTrailing)
-                .foregroundStyle(Theme.Colors.textTertiary)
-                .lineLimit(1)
+                .accessibilityLabel("\(notes.characterCount) characters in this note")
         }
-        .buttonStyle(.plain)
-        .focusable(false)
-        .accessibilityLabel(
-            notes.local.countsWords
-                ? Text(notes.characterCountLabel) : Text("\(notes.characterCount) characters in this note"))
-        .tooltip(String(localized: "Toggle between character count and word count"))
+        .font(Theme.Typography.rowTrailing)
+        .foregroundStyle(Theme.Colors.textTertiary)
+        .lineLimit(1)
     }
 }
 
@@ -138,15 +135,25 @@ private struct NoteTitlebarDragRegion: NSViewRepresentable {
     }
 }
 
+/// Measures the band only: macOS 27.2 starts no move from `performDrag(with:)`.
 private final class NoteTitlebarDragView: NSView {
     var onDoubleClick: (() -> Void)?
 
-    override func mouseDown(with event: NSEvent) {
-        if event.clickCount == 2 {
-            onDoubleClick?()
-            return
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    override func viewDidMoveToWindow() {
+        (window as? NotesPanel)?.claimsTitleBarDoubleClick = { [weak self] event in
+            self?.claimDoubleClick(event) ?? false
         }
-        window?.performDrag(with: event)
+    }
+
+    private func claimDoubleClick(_ event: NSEvent) -> Bool {
+        guard let window, bounds.contains(convert(event.locationInWindow, from: nil)),
+            // The traffic lights sit inside the band; a double-click on one stays theirs.
+            !(window.contentView?.superview?.hitTest(event.locationInWindow) is NSButton)
+        else { return false }
+        onDoubleClick?()
+        return true
     }
 }
 

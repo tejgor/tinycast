@@ -5,18 +5,12 @@ enum PaletteAxis {
     case horizontal
 }
 
-typealias MenuPanelClipPath =
-    @MainActor (
-        _ bounds: CGRect, _ metrics: InterfaceMetrics, _ corner: MenuPanelCorner
-    ) -> CGPath
-
 @MainActor struct PaletteMenuContent {
     let rowCount: Int
     let preferredSelection: Int?
     let isSelectable: (Int) -> Bool
     /// Whether a row opens a group, which is where ⌘↑ and ⌘↓ land.
     let startsSection: (Int) -> Bool
-    let clipPath: MenuPanelClipPath
     /// Built on demand: `moveMenu` resolves the open menu on every arrow key.
     let view: (MenuPanelCorner) -> AnyView
     /// Bounds-checked by the caller against `rowCount`, so a row index is always one this menu has.
@@ -27,8 +21,7 @@ typealias MenuPanelClipPath =
         view: @escaping (MenuPanelCorner) -> AnyView,
         activate: @escaping (Int) -> Void,
         isSelectable: @escaping (Int) -> Bool = { _ in true },
-        startsSection: @escaping (Int) -> Bool = { _ in false },
-        clipPath: @escaping MenuPanelClipPath
+        startsSection: @escaping (Int) -> Bool = { _ in false }
     ) {
         self.rowCount = rowCount
         self.preferredSelection = preferredSelection
@@ -36,7 +29,6 @@ typealias MenuPanelClipPath =
         self.activate = activate
         self.isSelectable = isSelectable
         self.startsSection = startsSection
-        self.clipPath = clipPath
     }
 
     init(
@@ -57,13 +49,7 @@ typealias MenuPanelClipPath =
             },
             activate: { popover.items[$0].action() },
             isSelectable: { popover.items[$0].isSelectable },
-            startsSection: { popover.items[$0].startsSection || popover.items[$0].sectionTitle != nil },
-            clipPath: { bounds, metrics, corner in
-                PopoverMenu.SurfaceShape(
-                    attachment: corner.popoverAttachment, radius: metrics.radius.menuPanel,
-                    attachedRadius: metrics.size.menuButton / 2
-                ).path(in: bounds).cgPath
-            })
+            startsSection: { popover.items[$0].startsSection || popover.items[$0].sectionTitle != nil })
     }
 }
 

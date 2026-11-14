@@ -313,6 +313,12 @@ enum SettingsSearchCatalog {
             .aiSystemPrompt, "Send a system prompt",
             keywords: ["instructions", "persona"]),
         .init(
+            group: .aiChatPresets, "Chat Presets",
+            keywords: ["persona", "instructions", "system prompt"]),
+        .init(
+            .aiChatPresets, "Add Chat Preset",
+            keywords: ["new", "persona", "instructions", "system prompt"]),
+        .init(
             .aiMCPServers, "Enable MCP servers",
             keywords: ["tools", "model context protocol"]),
         .init(
@@ -422,6 +428,9 @@ enum SettingsSearchCatalog {
         .init(
             .snippetsSnippets, "Enable snippets",
             keywords: ["expansion", "keystrokes", "accessibility"]),
+        .init(
+            .snippetsSnippets, "Default action",
+            keywords: ["enter", "return", "paste", "copy", "primary"]),
         .init(
             group: .snippetsCommands, "Snippet commands",
             keywords: ["shortcut", "hotkey", "launcher", "browser"]),

@@ -17,6 +17,8 @@ final class NotesPanel: NSPanel, AnimatedPanel {
     var onMouseDown: (() -> Void)?
     /// Sees a key press before the field editor, which otherwise takes ⌘↑ and ⌘↓ as caret moves.
     var interceptKeyDown: ((NSEvent) -> Bool)?
+    /// The system title bar runs its own double-click action, so the band claims it before AppKit.
+    var claimsTitleBarDoubleClick: ((NSEvent) -> Bool)?
 
     private let acceptsMain: Bool
 
@@ -68,6 +70,11 @@ final class NotesPanel: NSPanel, AnimatedPanel {
     override func sendEvent(_ event: NSEvent) {
         if event.type == .leftMouseDown || event.type == .rightMouseDown { onMouseDown?() }
         if event.type == .keyDown, interceptKeyDown?(event) == true { return }
+        if event.type == .leftMouseDown, event.clickCount == 2,
+            claimsTitleBarDoubleClick?(event) == true
+        {
+            return
+        }
         // The search and rename fields own Escape while they are editing.
         guard event.type == .keyDown, Int(event.keyCode) == kVK_Escape, !event.isARepeat,
             (firstResponder as? NSTextView)?.isFieldEditor != true

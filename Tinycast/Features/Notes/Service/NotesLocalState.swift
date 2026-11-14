@@ -8,7 +8,6 @@ final class NotesLocalState {
     private enum Key {
         static let autoSizesWindow = "notesWindowAutoSizes"
         static let zoom = "notesZoom"
-        static let countsWords = "notesCountsWords"
         static let pinned = "notesPinned"
         static let lastOpened = "notesLastOpened"
     }
@@ -25,11 +24,6 @@ final class NotesLocalState {
 
     var zoom: Double {
         didSet { defaults.set(zoom, forKey: Key.zoom) }
-    }
-
-    /// The footer counts words instead of characters.
-    var countsWords: Bool {
-        didSet { defaults.set(countsWords, forKey: Key.countsWords) }
     }
 
     /// Pinned notes in the order they were pinned; ⌘1–⌘9 open the first nine.
@@ -50,7 +44,6 @@ final class NotesLocalState {
         autoSizesWindow = defaults.object(forKey: Key.autoSizesWindow) as? Bool ?? true
         let storedZoom = defaults.double(forKey: Key.zoom)
         zoom = Self.zoomSteps.contains(storedZoom) ? storedZoom : 1
-        countsWords = defaults.bool(forKey: Key.countsWords)
         pinned = (defaults.stringArray(forKey: Key.pinned) ?? []).map(NoteID.init(rawValue:))
         let opened = defaults.dictionary(forKey: Key.lastOpened) as? [String: Date] ?? [:]
         lastOpened = Dictionary(uniqueKeysWithValues: opened.map { (NoteID(rawValue: $0.key), $0.value) })

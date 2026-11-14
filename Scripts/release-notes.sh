@@ -11,7 +11,7 @@ TAG="${TAG:?TAG is required, e.g. v0.9.13-beta.61}"
 SHA="${SHA:-$(git rev-parse HEAD)}"
 VERSION="${VERSION:-${TAG#v}}"
 DISPLAY_NAME="${DISPLAY_NAME:-Tinycast}"
-BUNDLE_ID="${BUNDLE_ID:-com.tinycast.app}"
+BUNDLE_ID="${BUNDLE_ID:-com.abueammar.tinycast}"
 CASK="${CASK:-tinycast}"
 
 # Everything below this line is for the download page; the update window cuts here.
@@ -52,11 +52,7 @@ CHANGELOG="$(printf '%s\n' "$GENERATED" | sed -E \
     if [ -n "$COMPARE_URL" ]; then printf ' [Full changelog](%s)' "$COMPARE_URL"; fi
     printf '\n\n'
     printf 'Install via Homebrew, or open the DMG below and drag %s to Applications:\n' "$DISPLAY_NAME"
-    printf '```sh\nbrew trust --tap abue-ammar/tinycast\nbrew install --cask abue-ammar/tinycast/%s\n```\n' "$CASK"
-    # The stable DMG is arm64-only; macOS 26 is the last release that boots on Intel.
-    if [ "$CHANNEL" = "stable" ]; then
-        printf '%s\n' "On an **Intel** Mac, install \`abue-ammar/tinycast/tinycast-universal\` instead — same app, built with both slices."
-    fi
+    printf '```sh\nbrew install --cask %s\n```\n' "$CASK"
 } > "$BODY_OUT"
 
 printf '%s\n' "$CHANGELOG" | awk -v budget="$DISCORD_BUDGET" -v bullets="$DISCORD_BULLETS" '

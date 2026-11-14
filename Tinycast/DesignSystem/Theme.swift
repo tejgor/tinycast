@@ -2,6 +2,12 @@ import SwiftUI
 
 /// Central design tokens; every dark colour is the literal the forced-dark build shipped.
 enum Theme {
+    /// macOS 26 glass casts its own shadow; on 27 bare glass has none and needs the window's.
+    static var glassCastsShadow: Bool {
+        if #available(macOS 27, *) { return false }
+        return true
+    }
+
     enum Spacing {
         static let xxs: CGFloat = 2
         static let dictationWaveGap: CGFloat = 3
@@ -30,7 +36,7 @@ enum Theme {
     enum Radius {
         static let panel: CGFloat = 26
         static let row: CGFloat = 10
-        static let formField: CGFloat = 12
+        static let formField: CGFloat = 10
         /// Emoji tiles are roomier than list rows, so their corners take one larger step.
         static let emojiCell: CGFloat = 12
         static let menu: CGFloat = 6
@@ -121,7 +127,7 @@ enum Theme {
         /// Fixed so the recorder can't resize as its binding changes.
         static let shortcutRecorder: CGFloat = 120
         static let shortcutPopoverLine: CGFloat = 14
-        /// Summed from the laid-out bands; the width is pinned by `callout-test`.
+        /// Summed from the laid-out bands; the width is pinned by `CalloutTests`.
         static let shortcutPopover = CGSize(
             width: 176,
             height: Spacing.sm * 2 + heroKeyCap + Spacing.sm + shortcutPopoverLine * 2 + Spacing.sm
@@ -348,6 +354,8 @@ enum Theme {
         static let glyphDelay: TimeInterval = 0.24
         static let glyphFade: TimeInterval = 0.16
         static let glyphBlur: CGFloat = 4
+        /// Both springs rest within this, so the window's shadow is recut from the settled shapes.
+        static let settle: TimeInterval = 0.9
         /// Past the window's own close animation, so parking the buttons is never seen.
         static let parkAfterHide: TimeInterval = 0.3
         /// The capsule undershoots as it shortens, then settles.
@@ -414,9 +422,7 @@ enum Theme {
             adaptive(dark: .srgbInk(1, alpha: dark), light: .srgbInk(0, alpha: light))
         }
 
-        /// Fork-only: the tint Transparency lays over the glass below 100%; lightens the light surface.
-        static let transparencyScrim = adaptive(
-            dark: .srgbInk(0, alpha: 0.40), light: .srgbInk(1, alpha: 0.55))
+        static let panelScrim = adaptive(dark: .srgbInk(0, alpha: 0.40), light: .srgbInk(1, alpha: 0.55))
         static let dialogDimming = adaptive(
             dark: .srgbInk(0, alpha: 0.34), light: .srgbInk(0, alpha: 0.34))
         /// Find's marks, the Mac's own yellow: every match faint, the current one solid.

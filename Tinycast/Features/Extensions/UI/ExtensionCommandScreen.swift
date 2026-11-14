@@ -127,16 +127,7 @@ struct ExtensionCommandScreen: PaletteScreen {
                 guard let handler = filteredActions[index].handler else { return }
                 extensions.dispatch(handler: handler)
             },
-            startsSection: { filteredSectionStarts[$0] },
-            clipPath: { bounds, metrics, _ in
-                UnevenRoundedRectangle(
-                    topLeadingRadius: metrics.radius.menuPanel,
-                    bottomLeadingRadius: metrics.radius.menuPanel,
-                    bottomTrailingRadius: metrics.size.menuButton / 2,
-                    topTrailingRadius: metrics.radius.menuPanel,
-                    style: .continuous
-                ).path(in: bounds).cgPath
-            })
+            startsSection: { filteredSectionStarts[$0] })
     }
 
     func activate(at selection: Int) {
@@ -205,10 +196,6 @@ struct ExtensionCommandScreen: PaletteScreen {
             },
             activate: { index in
                 extensions.chooseAccessorySelection(accessory, value: items[index].value)
-            },
-            clipPath: { bounds, metrics, _ in
-                RoundedRectangle(cornerRadius: metrics.radius.menuPanel, style: .continuous)
-                    .path(in: bounds).cgPath
             })
     }
 

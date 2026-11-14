@@ -29,7 +29,7 @@ which matters because the updater refuses any bundle it cannot prove is ours.
 
 A stable release publishes two more from the `universal` job, `Tinycast-Universal-<version>.dmg` and
 `.zip`, built from the same commit at the same version and bundle id but with both slices. They are
-uploaded *after* the thin pair, which keeps the thin zip first in the asset list so builds predating
+uploaded _after_ the thin pair, which keeps the thin zip first in the asset list so builds predating
 architecture-aware selection keep choosing it.
 
 Three things a release must keep true, or the updater skips it:
@@ -40,7 +40,7 @@ Three things a release must keep true, or the updater skips it:
   `prerelease` flag. A tag of any other shape is treated as mis-published and skipped.
 - **It is not a draft.**
 
-**Both casks declare `auto_updates true`.** That is Homebrew's flag for an app that manages its own
+**Every cask declares `auto_updates true`.** That is Homebrew's flag for an app that manages its own
 version, and it is what keeps `brew update && brew upgrade` from fighting an app that updated itself:
 brew never reports Tinycast outdated, never re-downloads it, and never rolls a self-updated copy back.
 Removing that line would reintroduce exactly those three problems. See
@@ -68,14 +68,14 @@ so the checkout fetches every commit without blobs.
 
 It builds on an `xcode-27` runner with the newest released Xcode 27 and publishes a GitHub Release
 tagged `v<full-version>` with a versioned DMG and zip asset, marked prerelease for beta. On success
-it also bumps the matching cask in the tap, if it has one, and announces the release on Discord. A
-stable run also dispatches the Website workflow, because the site reads the latest version and the
-[changelog](https://tinycast.dev/changelog/) from GitHub at build time.
+it also announces the release on Discord. A stable run also dispatches the Website workflow, because
+the site reads the latest version and the [changelog](https://tinycast.dev/changelog/) from GitHub at
+build time.
 
 A stable run then fans out to a second job, `universal`, which rebuilds the same commit with
 `ARCHS="arm64 x86_64"` and attaches `Tinycast-Universal-<version>.dmg` / `.zip` to the release the
 first job created, then bumps `tinycast-universal`. macOS 26 is the last release that boots on Intel,
-and those Macs need both slices. Both jobs pin `ARCHS` explicitly and assert the slices on *every*
+and those Macs need both slices. Both jobs pin `ARCHS` explicitly and assert the slices on _every_
 shipping binary — the app, `ClipboardTextHelper`, `FileIndexHelper` and `Tinycast Dictation`:
 trusting `ARCHS_STANDARD` is what shipped a thin arm64 build to Intel users once already, and it
 also keeps the Apple silicon download from silently gaining a slice it never needs. A thin helper
@@ -122,18 +122,47 @@ Two details the script exists for:
 The Discord announcement carries the same changelog, truncated to fit Discord's component limit, and
 pings `@everyone`.
 
-### Homebrew tap automation
+### The bundle id handoff
 
-Each job's final step rewrites the `version` + `sha256` of its cask (`tinycast@beta` or
-`tinycast-universal`) in the [`homebrew-tinycast`](https://github.com/abue-ammar/homebrew-tinycast) tap
-and pushes. It needs a `HOMEBREW_TAP_TOKEN` repo secret — a fine-grained PAT with **Contents:
-read/write** on the tap repo. Without the secret the step logs a warning and skips; the release still
-publishes. The `sed` is anchored to `^  version` / `^  sha256`, so a cask's two-space indent on those
-lines is load-bearing.
+Tinycast moved from `com.tinycast.app` (and `.beta`, `.dev`) to `com.abueammar.tinycast`, because
+another team holds the old App ID and iCloud needs one. A copy from before the move refuses any update
+whose bundle id differs from its own, and that check is in code already shipped. So until
+**2027-05-13** every release also publishes a handoff, built from the `TinycastHandoff` target:
 
-`tinycast` is in [homebrew/cask](https://github.com/Homebrew/homebrew-cask/blob/main/Casks/t/tinycast.rb),
-so the stable job skips the step: Homebrew's autobump bot bumps it after a release.
+- **It wears the old id and the release's version**, so the old copy's checks pass, and it carries the
+  real app under `Contents/Helpers/`. `wrap-handoff.sh` embeds the stapled app, re-seals the handoff
+  and asserts its id and version; `package-handoff.sh` then notarizes, staples, zips and signs it.
+- **It is uploaded first, in its own call:** `Tinycast-<version>-Handoff.zip` in the build job,
+  `Tinycast-Universal-<version>-Handoff.zip` before the universal zip. An old copy takes the first zip
+  it can run; `ReleaseFeed` skips both for a copy that has moved.
+- **On launch it hands over and gets out of the way:** it records whether the old id was a login
+  item, unregisters it, swaps the app it carries into its own place, opens it and exits.
+  `BundleIdentifierMigration` then moves the preferences, folders and login item to the new id, and
+  repoints every saved path into the old folders. The user clicks Update and Relaunch once, then grants the macOS permissions again and
+  re-enters any AI API key or MCP secret: the Keychain asks before another id reads an item, and the
+  move must never ask.
 
-Both stable casks install `Tinycast.app` under `com.tinycast.app`, so they `conflicts_with` one
-another and Homebrew routes each Mac by `depends_on`: `tinycast` requires `arch: :arm64`, and
-`tinycast-universal` takes the Intel Macs.
+The casks in homebrew/cask still name the old id in `uninstall quit:` and `zap`, and need the new one
+after the first stable handoff release; the universal cask in the tap needs the same. On 2027-05-13
+the migration check fails, and the handoff goes with everything its row in
+[migrations.md](migrations.md) lists.
+
+### Homebrew casks
+
+`tinycast` and `tinycast@beta` are in [homebrew/cask](https://github.com/Homebrew/homebrew-cask),
+where Homebrew's autobump bot bumps each one after a release.
+
+`tinycast-universal` is the only cask left in the
+[`homebrew-tinycast`](https://github.com/abue-ammar/homebrew-tinycast) tap, and the `universal` job
+is the only job that touches it: its last step rewrites the cask's `version` + `sha256` and pushes.
+The tap's `tap_migrations.json` hands anyone who installed `tinycast` or `tinycast@beta` from the tap
+to homebrew/cask on `brew update`.
+
+The step needs a `HOMEBREW_TAP_TOKEN` repo secret — a fine-grained PAT with **Contents: read/write**
+on the tap repo. Without the secret the step logs a warning and skips; the release still publishes.
+The `sed` is anchored to `^  version` / `^  sha256`, so a cask's two-space indent on those lines is
+load-bearing.
+
+Both stable casks install `Tinycast.app` under `com.abueammar.tinycast`, so `tinycast-universal`
+declares `conflicts_with cask: "tinycast"`. `tinycast` requires `arch: :arm64`; `tinycast-universal`
+installs on any Mac.

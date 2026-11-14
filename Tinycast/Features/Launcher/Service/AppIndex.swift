@@ -804,6 +804,7 @@ final class AppIndex {
         let eligible = entries.filter {
             $0.kind != .meeting && $0.settingsOwner != .ai
                 && !($0.bundleID?.hasPrefix(Self.ownBundlePrefix) ?? false)
+                && $0.bundleID != Bundle.main.bundleIdentifier
         }
         return LauncherSuggestions.select(from: eligible, now: usage.now) { entry in
             // `hotKeyAction` is nil for an extension command, whose shortcut is keyed by entry ID.
@@ -816,7 +817,7 @@ final class AppIndex {
         }
     }
 
-    private static let ownBundlePrefix = "com.tinycast."
+    private static let ownBundlePrefix = "com.abueammar.tinycast"
 
     private func signals(
         for entry: AppEntry, usage: LauncherRankingStore.Snapshot
