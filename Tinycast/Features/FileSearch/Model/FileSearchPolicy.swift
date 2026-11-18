@@ -4,8 +4,8 @@ struct FileSearchPolicy: Sendable, Equatable {
     struct Request: Codable, Sendable, Equatable {
         let scopes: [String]
         let ignorePatterns: [String]
+        let includesHiddenFiles: Bool
         let homeDirectory: String
-        let includesHidden: Bool
         let usesIgnoreFiles: Bool
     }
 
@@ -30,16 +30,19 @@ struct FileSearchPolicy: Sendable, Equatable {
     /// Where a person keeps their own files, so a hit there leads one anywhere else in home.
     private static let personalFolders = ["/Desktop", "/Documents", "/Downloads"]
     /// Bumped when what a crawl stores changes, so an index built the old way is rebuilt.
-    private static let layoutVersion = "priors-2"
+    private static let layoutVersion = "priors-3"
+
+    var includesHiddenFiles: Bool { request.includesHiddenFiles }
 
     init(
-        scopes: [String], ignorePatterns: [String], homeDirectory: URL, includesHidden: Bool = false,
+        scopes: [String], ignorePatterns: [String], includesHiddenFiles: Bool, homeDirectory: URL,
         usesIgnoreFiles: Bool = true
     ) {
         self.init(
             Request(
-                scopes: scopes, ignorePatterns: ignorePatterns, homeDirectory: homeDirectory.path,
-                includesHidden: includesHidden, usesIgnoreFiles: usesIgnoreFiles))
+                scopes: scopes, ignorePatterns: ignorePatterns,
+                includesHiddenFiles: includesHiddenFiles, homeDirectory: homeDirectory.path,
+                usesIgnoreFiles: usesIgnoreFiles))
     }
 
     init(_ request: Request) {
@@ -49,8 +52,11 @@ struct FileSearchPolicy: Sendable, Equatable {
         homePath = homeDirectory.path
         roots = FileSearchScope.roots(for: request.scopes, homeDirectory: homeDirectory)
         ignore = FileSearchIgnoreList(patterns: request.ignorePatterns, homeDirectory: homeDirectory)
-        let switches = ["hidden=\(request.includesHidden)", "ignoreFiles=\(request.usesIgnoreFiles)", Self.layoutVersion]
-        fingerprint = Self.fnv1a((roots + ["\0"] + request.ignorePatterns + ["\0"] + switches).joined(separator: "\n"))
+        let visibility = request.includesHiddenFiles ? "hidden" : "visible"
+        let switches = ["ignoreFiles=\(request.usesIgnoreFiles)", Self.layoutVersion]
+        fingerprint = Self.fnv1a(
+            ([visibility] + roots + ["\0"] + request.ignorePatterns + ["\0"] + switches)
+                .joined(separator: "\n"))
     }
 
     static func == (lhs: Self, rhs: Self) -> Bool { lhs.request == rhs.request }
@@ -60,22 +66,28 @@ struct FileSearchPolicy: Sendable, Equatable {
         if FileSearchScope.contains(homePath, path) {
             let rest = path.dropFirst(homePath.count)
             for cloud in Self.cloudDrives where rest == cloud || rest.hasPrefix(cloud + "/") {
-                return Self.isPlain(rest.dropFirst(cloud.count)) ? 3 : 0
+                return Self.prior(of: rest.dropFirst(cloud.count), plain: 3)
             }
             if rest == "/Library" || rest.hasPrefix("/Library/") { return 0 }
-            guard Self.isPlain(rest) else { return 0 }
-            return Self.personalFolders.contains { rest == $0 || rest.hasPrefix($0 + "/") } ? 3 : 2
+            let isPersonal = Self.personalFolders.contains { rest == $0 || rest.hasPrefix($0 + "/") }
+            return Self.prior(of: rest, plain: isPersonal ? 3 : 2)
         }
         if let top = path.split(separator: "/").first, Self.systemFolders.contains(top) { return 0 }
-        return Self.isPlain(path[...]) ? 1 : 0
+        return Self.prior(of: path[...], plain: 1)
     }
 
-    private static func isPlain(_ path: Substring) -> Bool {
-        path.split(separator: "/").allSatisfy { component in
-            guard !component.hasPrefix(".") else { return false }
-            guard let dot = component.lastIndex(of: ".") else { return true }
-            return !bundleExtensions.contains(component[component.index(after: dot)...].lowercased())
+    /// A bundle's insides are never the user's own files; a hidden folder's are, just less often.
+    private static func prior(of path: Substring, plain: Int8) -> Int8 {
+        var prior = plain
+        for component in path.split(separator: "/") {
+            if let dot = component.lastIndex(of: "."),
+                bundleExtensions.contains(component[component.index(after: dot)...].lowercased())
+            {
+                return 0
+            }
+            if component.hasPrefix(".") { prior = min(prior, 1) }
         }
+        return prior
     }
 
     private static func fnv1a(_ text: String) -> UInt64 {

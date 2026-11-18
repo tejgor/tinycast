@@ -123,10 +123,12 @@ private struct CalcHistoryRow: View {
     }
 
     var body: some View {
-        IconCache.observeStyle()
-        return HStack(spacing: metrics.spacing.lg) {
-            Image(nsImage: IconCache.symbolIcon(named: pinned ? "pin" : "plus.forwardslash.minus")).resizable()
-                .frame(width: metrics.size.resultRowIcon, height: metrics.size.resultRowIcon)
+        HStack(spacing: metrics.spacing.lg) {
+            IconTile(
+                symbol: pinned ? "pin" : CommandID.calculatorHistory.sfSymbol,
+                tint: CommandID.calculatorHistory.tint, extent: IconCache.appIconBody
+            )
+            .frame(width: metrics.size.resultRowIcon, height: metrics.size.resultRowIcon)
             Text(format.localizedExpression(entry.expression))
                 .font(metrics.typography.rowTitle)
                 .foregroundStyle(.secondary)

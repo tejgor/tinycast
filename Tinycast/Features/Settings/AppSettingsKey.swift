@@ -39,7 +39,7 @@ enum AppSettingsKey: String, CaseIterable {
     case fileSearchIgnorePatterns = "fileSearchIgnorePatterns"
     case fileSearchRemovedDefaultPatterns = "fileSearchRemovedDefaultPatterns"
     case fileSearchShowInLauncher = "fileSearchShowInLauncher"
-    case fileSearchIncludesHidden = "fileSearchIncludesHidden"
+    case fileSearchIncludesHiddenFiles = "fileSearchIncludesHiddenFiles"
     case fileSearchUsesIgnoreFiles = "fileSearchUsesIgnoreFiles"
     case notesEnabled = "notesEnabled"
     case notesRendersMarkdown = "notesRendersMarkdown"
@@ -125,5 +125,7 @@ enum AppSettingsKey: String, CaseIterable {
     case dictationLanguage = "dictationLanguage"
     case supportReminders = "supportReminders"
     case settingsFileEnabled = "settingsFileEnabled"
+    case iCloudSyncEnabled = "iCloudSyncEnabled"
+    case iCloudSyncDisabledCategories = "iCloudSyncDisabledCategories"
     case allowedDeepLinks = "allowedDeepLinks"
 }

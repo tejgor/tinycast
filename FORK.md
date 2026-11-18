@@ -59,8 +59,8 @@ locally on one Mac. Everything in `AGENTS.md` still applies; this file only adds
 - Release builds use bundle id `com.tinycast.app.personal` (set in `project.yml`). Any id other than
   upstream's stable or beta one resolves to `ReleaseChannel.development`, which is what keeps the
   built-in updater from replacing this fork with an upstream release. Do not change it back.
-- Upstream moved to `com.abueammar.tinycast` (`BundleIdentifierMigration`), which only touches ids
-  under that prefix, so it leaves this one alone. Two lines keep the old id working: one in
+- Upstream moved to `com.abueammar.tinycast`; its one-off `BundleIdentifierMigration`, since removed,
+  only touched ids under upstream's old prefix and left this one alone. Two lines keep the old id working: one in
   `AppPaths.configFolderName` keeps the `tinycast-personal` settings folder, and one in
   `AppIndex.suggestions` keeps the running app out of its own suggestions.
 - Signed with the self-signed `Tinycast Self-Signed` identity in the login keychain (`docs/signing.md`).
@@ -80,10 +80,13 @@ locally on one Mac. Everything in `AGENTS.md` still applies; this file only adds
 - Notes lays out the whole note rather than letting TextKit 2 estimate off-screen heights, which
   made a long note's height (and the scroller) jump while scrolling (`NoteTextView.setFrameSize`,
   `NoteMarkdownRenderer.invalidateLayout`).
-- File Search phase 1: hidden files off by default, `.gitignore` / `.ignore` / `.rayignore` obeyed
-  (two switches in its settings), more default exclusions, and ranking that weighs personal folders,
-  recency, files opened from Tinycast and depth (`FileSearchIgnoreRules`, `FileSearchUsage`,
-  `FileSearchQuery`; `project.yml` adds the rules file to `FileIndexHelper`).
+- File Search phase 1: `.gitignore` / `.ignore` / `.rayignore` obeyed (Use ignore files in its
+  settings), more default exclusions, and ranking that weighs personal folders, recency, files opened
+  from Tinycast and depth, for name hits and upstream's through-folder hits alike
+  (`FileSearchIgnoreRules`, `FileSearchUsage`, `FileSearchQuery`, `FileIndex.Lift`; `project.yml` adds
+  the rules file to `FileIndexHelper`). The fork's Include hidden files gave way to upstream's
+  (`fileSearchIncludesHiddenFiles`); `FileSearchHiddenFilesMigration` carries the old toggle over and
+  is deleted after one release.
 - A Table button in the Notes formatting bar inserts an empty three-column table
   (`NoteEditAction.insertTable`); the minimum note window grew from 440 to 470 points to fit it.
 - Notes behaves more like Raycast Notes (see `docs/features/notes.md`):

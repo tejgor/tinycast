@@ -28,8 +28,8 @@ struct FileIndexTests {
 
         // Hidden files on, so the live checks below still cover a hidden folder's churn.
         let policy = FileSearchPolicy(
-            scopes: [root.path], ignorePatterns: ["node_modules", "~/Movies"], homeDirectory: root,
-            includesHidden: true)
+            scopes: [root.path], ignorePatterns: ["node_modules", "~/Movies"], includesHiddenFiles: true,
+            homeDirectory: root)
         let index = FileIndex()
         let snapshot = try build(policy, at: scratch.appending(path: "index.bin"))
         index.replace(with: snapshot, policy: policy)
@@ -38,6 +38,7 @@ struct FileIndexTests {
         search(index, root: root.path)
         try live(index, root: root, policy: policy)
         try ignoreFiles(in: scratch)
+        try folders(in: scratch)
 
         print(failures == 0 ? "File index tests passed" : "\(failures) file index tests failed")
         exit(failures == 0 ? 0 : 1)
@@ -170,7 +171,8 @@ struct FileIndexTests {
             to: repo.appending(path: ".gitignore"), atomically: true, encoding: .utf8)
         try "src/generated\n".write(to: repo.appending(path: ".rayignore"), atomically: true, encoding: .utf8)
 
-        let policy = FileSearchPolicy(scopes: [home.path], ignorePatterns: [], homeDirectory: home)
+        let policy = FileSearchPolicy(
+            scopes: [home.path], ignorePatterns: [], includesHiddenFiles: false, homeDirectory: home)
         let index = FileIndex()
         let snapshot = try build(policy, at: scratch.appending(path: "ignoring.bin"))
         index.replace(with: snapshot, policy: policy)
@@ -192,7 +194,8 @@ struct FileIndexTests {
             "a live update in a subfolder still obeys the ignore files above it")
 
         let off = FileSearchPolicy(
-            scopes: [home.path], ignorePatterns: [], homeDirectory: home, usesIgnoreFiles: false)
+            scopes: [home.path], ignorePatterns: [], includesHiddenFiles: false, homeDirectory: home,
+            usesIgnoreFiles: false)
         let unfiltered = try build(off, at: scratch.appending(path: "unfiltered.bin"))
         expect(
             unfiltered.lookup(repo.path + "/build-output/bundle.js") != nil && off.fingerprint != policy.fingerprint,
@@ -202,6 +205,65 @@ struct FileIndexTests {
         let app = repo.path + "/src/app.swift"
         let boosted = index.search(FileSearchQuery.prepare("a")!, filter: .all, boosts: [app: 5_000])
         expect(report?.name == "report.pdf" && boosted.first?.url.path == app, "a boost puts an opened file first")
+    }
+
+    static func folders(in scratch: URL) throws {
+        let root = URL(fileURLWithPath: realPath(scratch.path)).appending(path: "agents")
+        for file in [
+            ".claude/skills/surge/SKILL.md", ".claude/skills/review/SKILL.md",
+            ".codex/skills/surge/SKILL.md", "Projects/surge-skill.md",
+            "Projects/app/.claude/worktrees/copy/skills/surge/SKILL.md", ".zshrc"
+        ] {
+            try write(root.appending(path: file))
+        }
+        func policy(includesHiddenFiles: Bool) -> FileSearchPolicy {
+            FileSearchPolicy(
+                scopes: [root.path], ignorePatterns: FileSearchIgnoreList.defaults,
+                includesHiddenFiles: includesHiddenFiles, homeDirectory: root)
+        }
+        let index = FileIndex()
+
+        let visible = policy(includesHiddenFiles: false)
+        index.replace(with: try build(visible, at: scratch.appending(path: "visible.bin")), policy: visible)
+        expect(index.itemCount == 3, "hidden files stay out by default")
+        expect(paths(index, "claude surge skill").isEmpty, "and so do the folders that hold them")
+        try write(root.appending(path: ".bashrc"))
+        index.apply(folder: root.path)
+        try write(root.appending(path: ".claude/skills/surge/notes.md"))
+        expect(
+            !index.apply(folder: root.appending(path: ".claude/skills/surge").path) && index.itemCount == 3,
+            "neither a new dotfile nor an event inside a hidden folder adds anything")
+
+        let hidden = policy(includesHiddenFiles: true)
+        index.replace(with: try build(hidden, at: scratch.appending(path: "hidden.bin")), policy: hidden)
+        expect(
+            paths(index, "claude surge skill")
+                == ["~/.claude/skills/surge", "~/.claude/skills/surge/SKILL.md"],
+            "folders above an entry stand in for the terms its name lacks")
+        expect(paths(index, "laude surge skill").isEmpty, "a folder term must start a word")
+        expect(paths(index, "worktrees skill").isEmpty, "agent worktrees are skipped")
+        let surge = paths(index, "surge skill")
+        expect(surge.first == "~/Projects/surge-skill.md", "a name holding every term comes first")
+        expect(
+            Set(surge.dropFirst()) == [
+                "~/.claude/skills/surge", "~/.codex/skills/surge", "~/.claude/skills/surge/SKILL.md",
+                "~/.codex/skills/surge/SKILL.md"
+            ],
+            "then every entry its folders complete")
+        expect(
+            !paths(index, "skill").contains { !$0.lowercased().contains("skill") },
+            "a single term still matches names only")
+
+        try write(root.appending(path: ".claude/skills/forge/SKILL.md"))
+        index.apply(folder: root.appending(path: ".claude/skills").path)
+        expect(
+            paths(index, "claude forge skill")
+                == ["~/.claude/skills/forge", "~/.claude/skills/forge/SKILL.md"],
+            "an entry added since the snapshot is matched through its folders too")
+    }
+
+    static func paths(_ index: FileIndex, _ query: String) -> [String] {
+        index.search(FileSearchQuery.prepare(query)!, filter: .all).map { "\($0.parentPath)/\($0.name)" }
     }
 
     static func names(

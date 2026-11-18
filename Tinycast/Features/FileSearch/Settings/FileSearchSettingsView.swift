@@ -158,7 +158,8 @@ private struct FileSearchScopesSection: View {
     private var isDefault: Bool { settings.fileSearchScopes == FileSearchScope.defaultScopes }
 
     var body: some View {
-        Section {
+        @Bindable var settings = settings
+        return Section {
             ForEach(settings.fileSearchScopes, id: \.self) { scope in
                 SettingsScopeRow(
                     scope: title(for: scope),
@@ -177,6 +178,11 @@ private struct FileSearchScopesSection: View {
                         settings.fileSearchScopes = FileSearchScope.defaultScopes
                     }
                 }
+            }
+
+            Toggle(isOn: $settings.fileSearchIncludesHiddenFiles) {
+                SettingsRowTitle(.fileSearchSearchScopes, "Include hidden files")
+                Text("Files and folders whose names start with a dot, like ~/.config.")
             }
         } header: {
             SettingsSectionHeader(.fileSearchSearchScopes)
@@ -228,10 +234,6 @@ private struct FileSearchIgnoreSection: View {
     var body: some View {
         @Bindable var settings = settings
         Section {
-            Toggle(isOn: $settings.fileSearchIncludesHidden) {
-                SettingsRowTitle(.fileSearchIgnorePatterns, "Include hidden files")
-                Text("Files and folders whose names start with a dot.")
-            }
             Toggle(isOn: $settings.fileSearchUsesIgnoreFiles) {
                 SettingsRowTitle(.fileSearchIgnorePatterns, "Use ignore files")
                 Text("Skips what .gitignore, .ignore and .rayignore files list.")

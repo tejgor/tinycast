@@ -42,8 +42,8 @@ final class FileSearchCoordinator {
             FileSearchPolicy(
                 scopes: settings.fileSearchScopes,
                 ignorePatterns: settings.fileSearchEffectiveIgnorePatterns,
+                includesHiddenFiles: settings.fileSearchIncludesHiddenFiles,
                 homeDirectory: FileManager.default.homeDirectoryForCurrentUser,
-                includesHidden: settings.fileSearchIncludesHidden,
                 usesIgnoreFiles: settings.fileSearchUsesIgnoreFiles))
     }
 

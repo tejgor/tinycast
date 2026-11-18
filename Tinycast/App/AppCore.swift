@@ -37,8 +37,7 @@ final class AppCore {
     let settings: AppSettings
     /// Mirrors settings into settings.json; nil while the Backup pane's switch is off.
     @ObservationIgnored private var settingsFile: SettingsFileRepository?
-    /// The file's launcher items, kept to apply a waiting record once its app is installed.
-    @ObservationIgnored private var launcherSettingsFile: LauncherSettingsFile?
+    @ObservationIgnored private(set) lazy var settingsBindings = makeSettingsBindings()
     @ObservationIgnored private var appearanceObservation: NSKeyValueObservation?
     /// The last verdict `trackChatRoute` acted on; nil until it has read one.
     @ObservationIgnored private var chatsRunTheirOwnTools: Bool?
@@ -231,6 +230,7 @@ final class AppCore {
         injector: textInjector, appIndex: appIndex, hotKeys: hotKeys, favorites: favorites,
         visibility: visibility, ranking: launcherRanking, aliases: aliases,
         paletteCoordinator: paletteCoordinator, core: self)
+    @ObservationIgnored private(set) lazy var cloudSyncCoordinator = CloudSyncCoordinator(core: self)
     @ObservationIgnored private(set) lazy var mcpCoordinator = MCPCoordinator(
         settings: settings, store: mcpSettings, manager: mcp, core: self)
     /// Its own window and lifecycle, like Settings; Quick AI is the palette's half of the feature.
@@ -293,6 +293,9 @@ final class AppCore {
         Signposts.interval("AppCore.start") {
             // Shorten AppKit's ~2–3s tooltip delay; registration domain, so a user default wins.
             UserDefaults.standard.register(defaults: ["NSInitialToolTipDelay": 250])
+            if FileSearchHiddenFilesMigration.run(settingsFileEnabled: settings.settingsFileEnabled) {
+                settings.fileSearchIncludesHiddenFiles = true
+            }
             if NotesMenuBarButtonMigration.run(settingsFileEnabled: settings.settingsFileEnabled) {
                 settings.notesShowsInMenuBar = true
             }
@@ -421,9 +424,11 @@ final class AppCore {
                 // After the first scan, so the file's apps and panes have entries to match.
                 if settings.settingsFileEnabled, settingsFile == nil {
                     startSettingsFile(importing: true)
-                } else if let launcherSettingsFile {
-                    reportSettingsFileIssues(launcherSettingsFile.applyInstalled())
+                } else {
+                    let issues = settingsBindings.launcher.applyInstalled()
+                    if settingsFile != nil { reportSettingsFileIssues(issues) }
                 }
+                cloudSyncCoordinator.appIndexDidScan()
             }
             hotKeys.displayName = { [weak self] action in self?.hotKeyDisplayName(for: action) }
             hotKeys.allowsAction = { [weak self] in self?.allowsHotKeyAction($0) ?? false }
@@ -619,6 +624,7 @@ final class AppCore {
     func prepareForTermination() {
         if settings.dictationEnabled { dictationCoordinator.prepareForTermination() }
         settingsFile?.flush()
+        cloudSyncCoordinator.flush()
         clipboardTextIndexer?.stop()
         // HID remaps first: they outlive the process.
         hyperKey.prepareForTermination()
@@ -695,6 +701,7 @@ final class AppCore {
         track(
             { _ = $0.automaticallyCheckForUpdates },
             reproject: { $0.updateCoordinator.applyAutomaticChecking() })
+        track({ _ = $0.iCloudSyncEnabled }, reproject: { $0.cloudSyncCoordinator.applyEnabled() })
         track(
             {
                 _ = $0.windowManagementEnabled
@@ -788,9 +795,9 @@ final class AppCore {
         track(
             {
                 _ = $0.fileSearchScopes
+                _ = $0.fileSearchIncludesHiddenFiles
                 _ = $0.fileSearchIgnorePatterns
                 _ = $0.fileSearchRemovedDefaultPatterns
-                _ = $0.fileSearchIncludesHidden
                 _ = $0.fileSearchUsesIgnoreFiles
             }, reproject: { $0.fileSearchCoordinator.applyPolicy() })
         track({ _ = $0.snippetsEnabled }, reproject: { $0.snippetCoordinator.applySnippetsEnabled() })
@@ -927,21 +934,11 @@ final class AppCore {
     /// Mirrors settings into settings.json from now on; `importing` applies the file's own first.
     func startSettingsFile(importing: Bool) {
         guard settingsFile == nil else { return }
-        let shortcuts = HotKeySettingsFile(hotKeys: hotKeys)
-        let launcher = LauncherSettingsFile(
-            appIndex: appIndex, aliases: aliases, visibility: visibility, shortcuts: shortcuts)
         let file = SettingsFileRepository(
-            fileURL: AppPaths.settingsFile(),
-            bindings: SettingsFileSchema.bindings(
-                settings: settings, ai: aiSettings, quickActions: quickActionSettings,
-                shortcuts: shortcuts, launcher: launcher,
-                windowManagement: WindowManagementSettingsFile(
-                    sizes: customWindowSizes, layouts: windowLayouts, rooms: rooms, aliases: aliases,
-                    shortcuts: shortcuts)),
-            commit: shortcuts.commit)
+            fileURL: AppPaths.settingsFile(), bindings: settingsBindings.bindings,
+            commit: settingsBindings.commit)
         file.onIssues = { [weak self] issues in self?.reportSettingsFileIssues(issues) }
         settingsFile = file
-        launcherSettingsFile = launcher
         settings.settingsFileEnabled = true
         file.start(importing: importing)
     }
@@ -950,8 +947,20 @@ final class AppCore {
     func stopSettingsFile() {
         settingsFile?.flush()
         settingsFile = nil
-        launcherSettingsFile = nil
         settings.settingsFileEnabled = false
+    }
+
+    private func makeSettingsBindings() -> SettingsBindingSet {
+        let shortcuts = HotKeySettingsFile(hotKeys: hotKeys)
+        let launcher = LauncherSettingsFile(
+            appIndex: appIndex, aliases: aliases, visibility: visibility, shortcuts: shortcuts)
+        let bindings = SettingsFileSchema.bindings(
+            settings: settings, ai: aiSettings, quickActions: quickActionSettings,
+            shortcuts: shortcuts, launcher: launcher,
+            windowManagement: WindowManagementSettingsFile(
+                sizes: customWindowSizes, layouts: windowLayouts, rooms: rooms, aliases: aliases,
+                shortcuts: shortcuts))
+        return SettingsBindingSet(bindings: bindings, commit: shortcuts.commit, launcher: launcher)
     }
 
     private func reportSettingsFileIssues(_ issues: [SettingsFileIssue]) {
