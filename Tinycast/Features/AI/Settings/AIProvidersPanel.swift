@@ -45,6 +45,7 @@ struct AIProvidersPanel: View {
     @Environment(AISettingsStore.self) private var settings
     @Environment(ChatGPTSubscriptionManager.self) private var subscription
     @Environment(InstalledAIManager.self) private var installedAI
+    @Environment(MainAppLink.self) private var mainApp
 
     let onDone: () -> Void
 
@@ -168,7 +169,7 @@ struct AIProvidersPanel: View {
     }
 
     private var listActions: some View {
-        HStack(spacing: Theme.Spacing.xs) {
+        HStack(spacing: 0) {
             Menu {
                 ForEach(AIProviderKind.allCases) { provider in
                     Button(provider.title) {
@@ -189,7 +190,12 @@ struct AIProvidersPanel: View {
             Button {
                 pendingRemoval = selectedConnection
             } label: {
+                // A borderless button hits only its glyph's bounds, and a minus is a hairline.
                 Image(systemName: "minus")
+                    .frame(
+                        width: Theme.Size.settingsRowButton, height: Theme.Size.settingsRowButton
+                    )
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.borderless)
             .disabled(selectedConnection == nil)
@@ -198,7 +204,7 @@ struct AIProvidersPanel: View {
             Spacer(minLength: 0)
         }
         .padding(.horizontal, Theme.Spacing.xl)
-        .padding(.vertical, Theme.Spacing.md)
+        .padding(.vertical, Theme.Spacing.xxs)
     }
 
     // MARK: - Detail
@@ -365,10 +371,10 @@ struct AIProvidersPanel: View {
         case .idle, .starting:
             checkingRow("Codex")
         case .signedOut:
-            signInRow(.codex, check: { subscription.refresh() })
+            signInRow(.codex, check: { refresh(.codex) })
         case .connected:
             LabeledContent {
-                Button("Refresh") { subscription.refresh() }
+                Button("Refresh") { refresh(.codex) }
             } label: {
                 Text("Ready")
                 Text("\(subscription.models.count) models available")
@@ -403,7 +409,7 @@ struct AIProvidersPanel: View {
             LabeledContent {
                 HStack(spacing: Theme.Spacing.sm) {
                     Button("Install Codex CLI…") { NSWorkspace.shared.open(InstalledAIKind.codex.installURL) }
-                    Button("Check Again") { subscription.refresh() }
+                    Button("Check Again") { refresh(.codex) }
                 }
                 .fixedSize()
             } label: {
@@ -411,7 +417,7 @@ struct AIProvidersPanel: View {
                 Text(message)
             }
         case .failed(let message):
-            failedRow(message, retry: { subscription.refresh() })
+            failedRow(message, retry: { refresh(.codex) })
         }
     }
 
@@ -423,19 +429,19 @@ struct AIProvidersPanel: View {
             checkingRow(kind.title)
         case .ready:
             LabeledContent {
-                Button("Refresh") { installedAI.refresh(kind: kind) }
+                Button("Refresh") { refresh(kind) }
             } label: {
                 Text("Ready")
                 Text("\(status.models.count) models available")
             }
             if let account = status.account { accountRow(account, kind: kind) }
         case .signInRequired:
-            signInRow(kind, check: { installedAI.refresh(kind: kind) })
+            signInRow(kind, check: { refresh(kind) })
         case .notInstalled:
             LabeledContent {
                 HStack(spacing: Theme.Spacing.sm) {
                     Button("Install…") { NSWorkspace.shared.open(kind.installURL) }
-                    Button("Check Again") { installedAI.refresh(kind: kind) }
+                    Button("Check Again") { refresh(kind) }
                 }
                 .fixedSize()
             } label: {
@@ -443,7 +449,7 @@ struct AIProvidersPanel: View {
                 Text("Tinycast could not find the \(kind.command) command.")
             }
         case .failed(let message):
-            failedRow(message, retry: { installedAI.refresh(kind: kind) })
+            failedRow(message, retry: { refresh(kind) })
         }
         if let executable = status.executable { commandRow(executable) }
     }
@@ -484,6 +490,12 @@ struct AIProvidersPanel: View {
             ProgressView().controlSize(.small)
             Text("Checking \(title)…").foregroundStyle(.secondary)
         }
+    }
+
+    /// Both processes check: this one shows the answer, and the main app is the one using the tool.
+    private func refresh(_ kind: InstalledAIKind) {
+        if kind == .codex { subscription.refresh() } else { installedAI.refresh(kind: kind) }
+        mainApp.send(.refreshInstalledAI(kind))
     }
 
     private func signInRow(_ kind: InstalledAIKind, check: @escaping () -> Void) -> some View {

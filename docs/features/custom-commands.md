@@ -9,8 +9,8 @@ finishes.
 The pane carries the feature switch (off out of the box) and its launcher-visibility companion,
 both in `AppSettings` and in settings backups. Switching the feature off empties the launcher section and makes
 `CustomCommandCoordinator.runCustomCommand` (the single funnel for palette activation and global shortcuts) refuse to
-run anything; Carbon registrations and their bindings stay put, so re-enabling restores every shortcut
-without re-registering. "Show in launcher" only hides the section; shortcuts keep working.
+run anything; shortcuts leave Carbon but their bindings stay put, so re-enabling registers every
+shortcut again. "Show in launcher" only hides the section; shortcuts keep working.
 
 ## Invariants
 
@@ -20,7 +20,7 @@ without re-registering. "Show in launcher" only hides the section; shortcuts kee
 - A command that runs arbitrary shell is a security surface: the confirmation step cannot be bypassed, and
   an import of executable commands warns before it applies.
 - **A disabled command is inert, not gone.** `isEnabled == false` takes it out of the launcher slice
-  and `runCustomCommand` refuses it, so neither a row nor its still-registered shortcut can run it.
+  and `runCustomCommand` refuses it, and its shortcut leaves Carbon, so neither a row nor a key runs it.
   Name, command text, arguments, alias, favorite slot and shortcut stay exactly as they were, and the
   **Settings → Commands** row is the one place that turns it back on.
 - **An argument value is never spliced into the command text.** It is handed to zsh as a positional
@@ -38,8 +38,8 @@ Editing preserves the UUID and therefore its alias, favorite, visibility, and ho
 **Enabled** checkbox is the only writer of `isEnabled`, so the editor carries its current value through a
 save rather than offering a second control for it. Deleting
 goes through `CustomCommandCoordinator`, which unregisters the hotkey and clears those references before removing the
-command. Native settings backups include both commands and bindings; import warns before accepting
-executable content.
+command. A native backup's Custom Commands category carries both commands and bindings; import warns
+before accepting executable content.
 Deletion from Settings or the command browser confirms through Tinycast's dialog before removing the command.
 
 ## Launcher integration
@@ -154,28 +154,29 @@ Tinycast quits leaves its file behind in the temporary folder.
 
 ### Arguments
 
-A command may declare **up to three** arguments, each a name and an optional/required flag (Raycast's
-own cap, and what keeps the fields on screen). `CustomCommandArgument.sanitized` enforces it on every
-path in, so a stored or imported command carrying more keeps its first three and drops the rest, the
-way Raycast ignores an `argument4`. The editor's **Add** stops at three.
+A command may declare **up to three** arguments, each a name and an optional/required flag (what
+keeps the fields on screen). `CustomCommandArgument.sanitized` enforces it on every path in, so a
+stored or imported command carrying more keeps its first three and drops the rest. The editor's
+**Add** stops at three.
 
-They are filled **inline beside the search field** when the command's row is selected in root search,
-as a quicklink's are (see [palette.md](palette.md#inline-row-arguments)).
+They are filled **inline beside the search field** when the command's row is selected in root
+search, as a quicklink's are (see [palette.md](palette.md#inline-row-arguments)).
 `CustomCommandArgumentsAccessory` builds the strip; Tab walks into it, and ↵ with a required field
-still empty focuses that field instead of running (Raycast's rule). An optional field left empty is
-never marked as owed.
+still empty focuses that field instead of running. An optional field left empty is never marked as
+owed.
 
 **The fields are keyed by position, not name** (`CustomCommandArgument.fieldID(at:)`, `$1` to `$3`)
 because two arguments may share a name, and keying by name would give them one value and one focus.
 `CustomCommand.positionalValues(from:)` turns the fields back into `$n` order, or nil while a required
 one is empty.
 
-`runCustomCommand(id:values:)` is still the one funnel for every entry point. A launcher row hands it
-the typed values; a **global hotkey or favorite slot** hands it none. Either way, a required value still
-missing opens root search onto that command alone (the query seeded with its name, its row the only
-one listed, its first empty field focused) through `PaletteCoordinator.showArguments(of:values:)`.
-That is what Raycast does for a hotkey. The row is listed even when the command is hidden from the
-launcher, since its shortcut still has to be answered; typing anything else returns to a normal search.
+`runCustomCommand(id:values:)` is still the one funnel for every entry point. A launcher row hands
+it the typed values; a **global hotkey or favorite slot** hands it none. Either way, a required
+value still missing opens root search onto that command alone (the query seeded with its name, its
+row the only one listed, its first empty field focused) through
+`PaletteCoordinator.showArguments(of:values:)`. The row is listed even when the command is hidden
+from the launcher, since its shortcut still has to be answered; typing anything else returns to a
+normal search.
 
 Values reach zsh as **positional parameters**, never as text substituted into the command:
 

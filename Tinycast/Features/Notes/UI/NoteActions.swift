@@ -75,10 +75,10 @@ extension NotesCoordinator {
             items += [
                 NoteActionItem(
                     id: "auto-size",
-                    title: autoSizesWindow
+                    title: fitsWindowToNote
                         ? String(localized: "Disable Window Auto-Sizing")
                         : String(localized: "Enable Window Auto-Sizing"),
-                    symbol: "arrow.up.and.down.square", section: 2, perform: toggleWindowAutoSizing),
+                    symbol: "arrow.up.and.down.square", section: 2, perform: toggleWindowFitting),
                 NoteActionItem(
                     id: "zoom-in", title: String(localized: "Zoom In"), symbol: "plus.magnifyingglass",
                     shortcut: "⌘+", section: 2, perform: zoomIn),

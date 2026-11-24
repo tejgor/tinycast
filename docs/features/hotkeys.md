@@ -103,18 +103,22 @@ own pane when `SettingsTab.ownedCommands` names it. `hotkey.togglePalette` is th
 no command row. `HotKeyManager` names them all through `CommandID`, so a conflict callout spells an
 action exactly as its command row does.
 
-Like a window command, the chord registers regardless of the launcher row. Search Files and Notes both
+The chord registers regardless of the launcher row. Search Files and Notes both
 re-check their feature switches before opening; see [file-search.md](file-search.md#invocation) and
 [notes.md](notes.md#ownership-and-enablement). A hidden launcher row does not disable its shortcut, but
-disabling the feature does. `SettingsBackup.HotkeyBackup` carries them as one `commands` map keyed by
+disabling the feature does: whatever `AppCore.allowsHotKeyAction` refuses, `HotKeyManager.applyAllowance`
+unregisters from Carbon, so the key reaches other apps rather than being swallowed and ignored.
+Disabling one snippet, quicklink or custom command does the same for its own shortcut. Snippets load
+after `start()`, so their shortcuts register once the store's `snippets` arrive.
+`SettingsBackup.HotkeyBackup` carries them as one `commands` map keyed by
 `CommandID` raw value.
 
 System actions and window commands are the fixed-catalog case: they persist under
 `hotkey.systemAction.<raw-id>` and `hotkey.windowCommand.<raw-id>`
 and need **no** bound-ID index, because `start()` and `conflictOwner` can just iterate `allCases` and
-`register` no-ops on an unbound item. A registered window-command shortcut still runs nothing while the
-feature switch is off: `WindowCommandCoordinator.runWindowCommand` re-checks it (see
-[window-management.md](window-management.md)); a system-action shortcut likewise goes through
+`register` no-ops on an unbound item. While Window Management is off a window-command shortcut is
+unregistered, and `WindowCommandCoordinator.runWindowCommand` re-checks the switch for every other route
+(see [window-management.md](window-management.md)); a system-action shortcut likewise goes through
 `SystemActionCoordinator.runSystemAction(id:)`, so the confirmation gate holds for a hotkey exactly as it does for the
 palette.
 
@@ -295,6 +299,12 @@ input-source preference enabled, turning it on needs 150 ms, and a shorter press
 switches between the last ASCII source and a recent non-ASCII source. `HyperKeyQuickPress.effect` is
 that rule. A combo or a cancelled hold never runs its Quick Press action.
 
+When Universal Control forwards input, the sending Mac's Quartz tap can see Caps Lock go down and up
+while only the receiving Mac sees the letter. While it forwards, Tinycast also reads the physical
+keyboard and runs Quick Press only when the keyboard reports a solo press and Quartz recognizes the
+same release as Hyper. The Accessibility grant covers that read, so nothing is requested. If
+Tinycast is switched off under Input Monitoring, Quick Press uses the events visible to Quartz.
+
 ### Conflicts and diagnostics
 
 `HyperKeyConflictPolicy` is the pure rule, tested by `HyperKeyTests`; `HyperKeyConflictScanner` reads the
@@ -405,20 +415,6 @@ The one-second watchdog runs only while waiting (for a grant, a refused remap or
 retries `apply()`. The HID remap outlives the process, so `applicationWillTerminate` takes it off every
 keyboard before exiting.
 
-## The Dictation key
-
-Apple's 🎤 key (Consumer `0xC000000CF`) can't be recorded. While a recorder is open or a binding uses
-F20, `DictationKeyManager` remaps it to **F20**, a bare F-key Carbon fires on press and release, even
-in Secure Input, with no tap or permission. Otherwise, and in other users' sessions, macOS Dictation
-keeps it. F20 keycaps draw as `mic`.
-
-Like Hyper's, its remap and recovery journal are guarded by a `RemapInstanceLock`, on
-`com.tinycast.dictation-key.lock`, held while the remap is wanted. A second copy that finds the lock
-held leaves both alone: the remap is system-wide, so its F20 already arrives.
-It subscribes to the shared one-second watchdog while waiting for ownership, then takes over when
-the owner quits or stops using the key. Taking ownership, removing the binding, leaving the session
-or terminating stops the retry.
-
 ## Recorder
 
 The settings recorder (`Features/HotKeys/UI/ShortcutRecorder.swift`) is deliberately **not** a focusable
@@ -433,3 +429,10 @@ Setting `recordingAction` is what starts and stops the capture, so there is exac
 callout above the field render the live state from outside the row that opened it. The field itself
 only ever shows the binding; the prompt, the live preview and the conflict message all live in the
 callout. See [ui.md](../ui.md#the-shortcut-recorder-callout).
+
+Settings records in its own process, where `reloadBindings()` reads the bindings without starting
+the shortcut engines. Its `recordingAction` is sent to the main app the moment it
+changes and sets `isRecordingInSettings`, which pauses the main app's engines exactly as a local recorder
+does. The main app clears it if Settings' process ends mid-recording. Settings sends the action and
+the binding to the main app, which updates the registration and saves the shortcut. The recorder
+checks conflicts against its local copy, which reloads when the main app publishes changes.

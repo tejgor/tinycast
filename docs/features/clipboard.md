@@ -32,7 +32,14 @@
 - A database that cannot be opened is deleted and recreated. That is sound because a history is
   captured rather than authored, and there is no UI for an unavailable clipboard; `QuicklinkStore`
   deliberately does the opposite. It is **not** a licence to treat the file as disposable: it lives in
-  Application Support precisely because nothing else can put it back.
+  Application Support precisely because nothing else can put it back. The rebuild sets `wasRebuilt`,
+  so iCloud Sync merges the empty history again instead of deleting it from every Mac.
+- **Rowid order is the history's recency, synced rows included.** `applySynced` writes another
+  Mac's entries on its own connection off the main actor, in one transaction, then moves every row
+  from the earliest arrival on to fresh rowids in time order. Re-indexing FTS is what that costs,
+  about 70 µs a row, which is why it never runs on the main actor; the main connection's busy
+  timeout outlasts it, so a capture waits rather than failing. Anything that fails rolls the batch
+  back and comes back as ids to retry, and a removed row's blob is deleted only after the commit.
 - **A link or an address is derived from the text, never persisted.** `ClipboardItem.Kind` holds
   only what capture can tell apart on the pasteboard (`text`, `image`, `file`), so improving the
   _classifier_ stays a code change rather than a database migration plus a backfill, while a new
@@ -221,8 +228,8 @@ naming it, so it cannot recreate a deleted entry. Backups stream the original fi
 OCR metadata.
 
 Work is bounded: files up to 32 MB, the first 64 PDF pages, a 4,194,304-pixel bitmap budget with a
-4096-pixel maximum edge, and 32 KB of UTF-8 text per item. An empty, unsupported or oversized input
-is a completed attempt. Failed recognition, a locked or unreadable input and a helper failure go to
+4096-pixel maximum edge, and 32 KB of UTF-8 text per item. An empty, unsupported, oversized or
+deleted input is a completed attempt. Failed recognition, a locked or unreadable input and a helper failure go to
 `item_text_failures` instead: up to three attempts 30 seconds apart, which never block another item.
 Success and deletion clear that state. Enabling text search resets failures and earlier empty
 attempts so they can be tried again, keeping recognized text that is not empty, so an empty input
@@ -399,9 +406,9 @@ Pins change five things:
   of a busy query's matches, which holds because every pinned row is resident in `items`, however
   old (`load` fetches them all, and neither the window trim nor pruning drops one). OCR metadata
   for matching pins is queried separately off-main without the unpinned result limit.
-- **Unpinning re-recencies.** An unpinned row rejoins the history as its _newest_ entry (Raycast does
-  the same) rather than dropping back into the date bucket it came from, which would scroll the list
-  out from under the selection. It uses the same atomic timestamp and rowid update as `promote`.
+- **Unpinning re-recencies.** An unpinned row rejoins the history as its _newest_ entry rather than
+  dropping back into the date bucket it came from, which would scroll the list out from under the
+  selection. It uses the same atomic timestamp and rowid update as `promote`.
 - **Retention.** Pruning skips pinned rows (`AND pinned_at IS NULL`), so a pin outlives the retention
   window, and "Clear History" skips them on the same condition, so only `remove` drops a pin.
 - **Selection.** Pinning lifts a row out of its date bucket, so `ClipboardCoordinator.togglePinnedClip` moves the

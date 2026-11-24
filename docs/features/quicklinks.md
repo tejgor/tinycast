@@ -7,8 +7,8 @@ one quicklink adapt to typed input, the clipboard, the selection, or the date.
 The feature ships **off**. **Settings → Quicklinks** carries the switch and its launcher-visibility
 companion. Off is fully off: no launcher section, no `Create` / `Search` / `Import` / `Export`
 Quicklinks commands, and `QuicklinkCoordinator.openQuicklink` (the single funnel palette activation and global
-shortcuts both reach) refuses to open anything. Bindings stay registered, so re-enabling restores
-every shortcut without re-registering.
+shortcuts both reach) refuses to open anything. Shortcuts leave Carbon while it is off, so their keys
+reach other apps, and re-enabling registers them again.
 
 ## Invariants
 
@@ -90,32 +90,32 @@ that begins with a scheme picks the destination kind: a `{clipboard | raw}` hold
 resolves to a local path rather than to the web link the template looked like. Encoding is what
 normally prevents that, which is why `| raw` is a deliberate authoring choice and not a default.
 
-`{selectedText}` is accepted as an alias for `{selection}`, so a link pasted from Raycast's docs
-works unchanged. `{selection}` stays the canonical spelling and is the only one the editor's
-**Insert Placeholder** menu writes. `{query}` is accepted as an alias for `{argument}` for the same reason;
-a Raycast import rewrites it to `{argument}` before the row is stored.
+`{selectedText}` is accepted as an alias for `{selection}`, so an imported link works unchanged.
+`{selection}` stays the canonical spelling and is the only one the editor's **Insert Placeholder**
+menu writes. `{query}` is accepted as an alias for `{argument}` for the same reason; a Raycast
+import rewrites it to `{argument}` before the row is stored.
 
 ## Arguments
 
 A quicklink whose placeholders still need values doesn't open; it collects them **in the header,
-beside the search field**, as inline chips. There is no argument screen: the row that owns the values
-stays selected and visible the whole time, the way Raycast does it. The mechanics of the strip belong
-to the palette and are described in
-[palette.md](palette.md#inline-row-arguments); what quicklinks own is which fields appear and what an
-answer means.
+beside the search field**, as inline chips. There is no argument screen: the row that owns the
+values stays selected and visible the whole time. The mechanics of the strip belong to the palette
+and are described in [palette.md](palette.md#inline-row-arguments); what quicklinks own is which
+fields appear and what an answer means.
 
 The fields are exactly the `{argument}`s the link declares, read straight off the template by
-`SnippetTemplateEngine.declaredArguments(in:)`: a pure parse, so nothing is expanded and no clipboard
-is read to draw a chip. An argument with a `default=` is still offered, as an optional chip: left
-empty, the default fills it, so a default is a starting value rather than a fixed one. It stays owed
-if any occurrence of that name lacks a `default=`, because expansion falls back per occurrence.
-`QuicklinkArgumentsAccessory` turns that list into the strip; a field declaring `options=` is chosen
-from the palette's own menu rather than typed. **A chip marks nothing up front.** It draws like every
-other field until the caret has been in it and left it empty, and only then takes a red edge: a row
-you have not touched yet is not a row you owe anything on, which is how Raycast reads. The strip is
-given the row's identity, so that memory starts clean on the next quicklink. The strip is placed `.afterQuery` in root search (a
-glyph, then the chips, right after the typed text) and `.besideSearchField` on Search Quicklinks,
-where the field stays a filter with its prompt intact and the row below already carries the glyph.
+`SnippetTemplateEngine.declaredArguments(in:)`: a pure parse, so nothing is expanded and no
+clipboard is read to draw a chip. An argument with a `default=` is still offered, as an optional
+chip: left empty, the default fills it, so a default is a starting value rather than a fixed one. It
+stays owed if any occurrence of that name lacks a `default=`, because expansion falls back per
+occurrence. `QuicklinkArgumentsAccessory` turns that list into the strip; a field declaring
+`options=` is chosen from the palette's own menu rather than typed. **A chip marks nothing up
+front.** It draws like every other field until the caret has been in it and left it empty, and only
+then takes a red edge: a row you have not touched yet is not a row you owe anything on. The strip is
+given the row's identity, so that memory starts clean on the next quicklink. The strip is placed
+`.afterQuery` in root search (a glyph, then the chips, right after the typed text) and
+`.besideSearchField` on Search Quicklinks, where the field stays a filter with its prompt intact and
+the row below already carries the glyph.
 
 **`{selection}` is never a field, and an empty one fails.** It is read when the link opens, after
 every owed argument is in, through the two tiers in
@@ -254,10 +254,9 @@ prepared statements, an `isolated deinit`):
   `QuicklinkError.storageUnavailable`, and the pane says so. `Tests/QuicklinkTests.swift` asserts the
   file survives byte-for-byte.
 
-`CREATE TABLE IF NOT EXISTS` leaves an existing table alone, so a new column arrives as an unchecked
-`ALTER TABLE … ADD COLUMN … DEFAULT` right after the schema, which fails harmlessly once the column is
-there. That appends it physically, so the prepared statements **name their columns in the struct's
-order** rather than the table's, and the row reader stays a straight top-to-bottom read.
+The table stores `is_enabled` last, after `created_at`, so the prepared statements **name their
+columns in the struct's order** rather than the table's, and the row reader stays a straight
+top-to-bottom read.
 
 Editing preserves the UUID, and with it the quicklink's shortcut, favorite slot, visibility and
 learned ranking. Deleting goes through `QuicklinkCoordinator`, which unwinds all four after removing
@@ -269,7 +268,7 @@ Duplicating takes a **new** identity, so the copy can't inherit the original's s
 `HotKeyAction.quicklink(id:)` persists under `hotkey.quicklink.<uuid>` with a
 `boundQuicklinkIDs` index, the same shape custom commands use; both are per-item rather than
 per-catalog-entry, so both need an index for `start()` to re-register from. The store therefore loads
-**even while the feature is off** and before `hotKeys.start`: the stale-binding prune reads that
+**even while the feature is off** and before `hotKeys.load`: the stale-binding prune reads that
 list, and an unloaded store would look like "every quicklink was deleted" and throw the shortcuts
 away.
 
@@ -283,7 +282,8 @@ can't import its own duplicates. Skipped entries are counted and reported in the
 takes a fresh identity for every entry, so it can never collide with a shortcut an existing quicklink
 owns.
 
-Quicklinks and their bindings also ride in native settings backups, and the settings flags with them.
+Quicklinks and their bindings ride in a native backup's own Quicklinks category, and the settings
+flags in Settings & Shortcuts.
 Unlike `snippetsEnabled`, `quicklinksEnabled` grants no permission class and enables no listening, so
 excluding it would be cargo-culting.
 

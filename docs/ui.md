@@ -38,8 +38,8 @@ These are the things that quietly break the look if changed. Preserve them unles
 - **Dark is the baseline and its values are frozen.** Every `Theme.Colors` token resolves per appearance, and its **dark branch is the literal the forced-dark build shipped**, restated, never recomputed. Retune a light branch freely; touch a dark one only when the task is to change Dark. `AppCore.applyAppearance()` is the only place an appearance is assigned, from `AppSettings.appearance`; `.system` assigns `nil` so AppKit follows macOS.
 - **New colors go through `Theme.Colors.ramp(dark:light:)`** (an alpha that inverts) or `adaptive(dark:light:)` (two explicit `NSColor`s, for anything that isn't a plain inversion: `panelScrim`, `layoutPreviewGround`). Never a bare `Color.white.opacity(…)` in a view: it disappears in Light.
 - **No grays, no opaque fills on the surface.** Reach for `Theme.Colors.*` instead of `.gray`, `NSColor.windowBackground`, etc.
-- **Some colors stay fixed in both appearances, on purpose.** The `EdgeDissolve`/`OverflowFade` gradients are **mask luminance, not color**; inverting them breaks the dissolve everywhere. `IconTile` and the extension `SymbolTile` keep white ink, because a saturated tile carries its own contrast. The selected compact shortcut glyph also stays white over its contrasting fill. And `IconCache` cannot use a dynamic `NSColor` at all: it rasterizes off-main, so the surface is carried explicitly and is part of the cache key.
-- **An icon is drawn for a surface _and_ a system icon style, and both move under you.** macOS restyles the icons `NSWorkspace` hands out when System Settings → Appearance → **Icon & widget style** changes, so `IconStyleMonitor` and Tinycast's own appearance both call `IconCache.invalidateStyled()`. **The monitor may not invalidate on the notification itself.** AppKit posts `NSWorkspaceIconAppearanceConfigurationDidChange` before IconServices has swapped what `NSWorkspace` vends (measured at 25–120ms behind, jittering run to run), and the images it hands back are live objects macOS restyles in place, so flattening one on the signal freezes the _outgoing_ style into a bitmap nothing ever invalidates again. `IconStyleMonitor` therefore polls `IconCache.styleFingerprint()` until the pixels actually move, and only then invalidates. Waiting also sidesteps the cost: re-flattening every icon the instant a restyle begins forces a cold IconServices regeneration, measured at 160× the settled draw cost. That drops the cached bitmaps, bumps every cache key so an in-flight decode cannot repopulate a stale one, and moves `IconCache.style.generation`. **Any view that draws an icon must key its fetch on that generation**: wrap the view's own key in `IconRequest`, or call `IconCache.observeStyle()` where the icon is resolved synchronously in a `body`. It is reached through `IconCache` rather than injected precisely because icons are drawn in menus, popovers and every list, where a missed injection would be a silent staleness bug.
+- **Some colors stay fixed in both appearances, on purpose.** The `EdgeDissolve`/`OverflowFade` gradients are **mask luminance, not color**; inverting them breaks the dissolve everywhere. `IconTile` and the extension `SymbolTile` keep white ink on a saturated ground, which carries its own contrast; only the system icon style (see "Icon pack") changes how a tile paints. The selected compact shortcut glyph also stays white over its contrasting fill. And `IconCache` cannot use a dynamic `NSColor` at all: it rasterizes off-main, so the surface is carried explicitly and is part of the cache key.
+- **An icon is drawn for a surface _and_ a system icon style, and both move under you.** macOS restyles the icons `NSWorkspace` hands out when System Settings → Appearance → **Icon & widget style** changes, so `IconStyleMonitor` and Tinycast's own appearance both call `IconCache.invalidateStyled()`. **The monitor may not invalidate on the notification itself.** AppKit posts `NSWorkspaceIconAppearanceConfigurationDidChange` before IconServices has swapped what `NSWorkspace` vends (measured at 25–120ms behind, jittering run to run), and the images it hands back are live objects macOS restyles in place, so flattening one on the signal freezes the _outgoing_ style into a bitmap nothing ever invalidates again. `IconStyleMonitor` therefore polls `IconCache.styleFingerprint()` until the pixels actually move, and only then invalidates. Waiting also sidesteps the cost: re-flattening every icon the instant a restyle begins forces a cold IconServices regeneration, measured at 160× the settled draw cost. That drops the cached bitmaps, bumps every cache key so an in-flight decode cannot repopulate a stale one, moves `IconCache.style.generation`, and re-reads the style `IconTile` paints in, so a tile changes on the same frame as the app icons beside it. **Any view that draws an icon must key its fetch on that generation**: wrap the view's own key in `IconRequest`, or call `IconCache.observeStyle()` where the icon is resolved synchronously in a `body`. It is reached through `IconCache` rather than injected precisely because icons are drawn in menus, popovers and every list, where a missed injection would be a silent staleness bug.
 - **No hard dividers between the list and the bars.** The header and bottom bar are `safeAreaInset` overlays with no background; separation comes from `edgeDissolve()`, nothing else. (One deliberate exception: the vertical hairline between a list and its preview pane, as the clipboard and file search screens draw.)
 - **The root clip owns the expanded panel's corner and the window's shape.** `RootPaletteView.body` applies `.background(panelScrim)`, then a `.background` of `Color.clear.glassEffect(.regular, in: Rectangle())` (`.identity` while compact, so the tree never changes), then ends with `.clipShape(RoundedRectangle(26, .continuous))`. Keep the glass square: glass in a rounded shape feathers its own edge, and under a clip of the same curve the corner anti-aliases twice and reads soft (an alpha ramp of 3–8 px at the curve against 2–4 px). Keep the glass _behind_ the scrim rather than wrapping it: given the scrim as its content, the glass keeps its rim brighter above it (107 against 84 on a dark desktop), while a scrim over the glass dims the rim with everything else. The clip is last. AppKit owns only the window; the glass and everything in it are SwiftUI. The clip is what lets macOS read the panel's outline for the system shadow. **Never remove that clip, and never make bare glass the window's content:** with only glass in a borderless window, macOS cannot read a shape and shadows the default window outline instead (rounded top, square bottom), which shows as a pale rectangle and a broken hairline over a light desktop. The shadow and its hairline are the system's, and so is the glass rim, which Liquid Glass lights on the top and bottom edges and fades around the corners; Tinycast draws none of them. Compact uses zero root corner radius and a four-point drawing outset so its native glass shapes own their contours without touching the window boundary.
 - **Transparency thins the scrim (fork-only).** Settings → General → **Transparency** (`AppSettings.paletteTransparency`, 0–100, default 0) scales `panelScrim`'s opacity on the expanded palette, the compact bar and the note window, down to bare glass at 100. Dialogs, HUDs and every other `panelScrim` surface keep the full tint.
@@ -427,9 +427,9 @@ or pass `includingTop: true` for a bounded popup whose title and rows scroll tog
 
 ## Icon pack
 
-Source: `DesignSystem/IconTile.swift`, `DesignSystem/IconTint.swift`, `Theme.IconTile`. Every icon,
-previewed, with this guide: the **Tinycast Icon Pack** artifact
-(https://claude.ai/artifact/9jWyGYLNGDFPQHiNb3s3KB, files `icons.js` and `glyphs/`).
+Source: `DesignSystem/IconTile.swift`, `DesignSystem/IconTint.swift`, `Theme.IconTile`. The pack's
+first icons, previewed with this guide, are in the **Tinycast Icon Pack** artifact
+(https://claude.ai/artifact/9jWyGYLNGDFPQHiNb3s3KB); the code, not the artifact, is the full list.
 
 Every launcher entry drawn from a symbol is an `IconTile`: a white SF Symbol on its tint's gradient,
 the way System Settings draws its sidebar. The Settings sidebar uses the same tile.
@@ -445,9 +445,19 @@ the way System Settings draws its sidebar. The Settings sidebar uses the same ti
 - **Tint.** One of the 13 `IconTint`s, chosen by feature: every Notes icon is yellow, every Calendar
   icon red. Red also marks an action that ends or deletes something. Two sidebar neighbours never share
   one. The values live only in `Theme.IconTile.fill(_:)`, fixed in both appearances.
+- **Style.** General → Appearance → **Icon style** (`AppSettings.iconStyle`, `.system` by default)
+  either follows System Settings → Appearance → **Icon & widget style** or keeps Default's colours.
+  `SystemIconTheme` reads the style from the `AppleIconAppearanceTheme` global default, since no API
+  exposes it, and `AppCore.applyIconStyle()` projects the choice into `IconCache.style`. Default puts
+  the tint on the ground; Dark moves it to the glyph on a near-black ground (graphite lifts to gray);
+  Clear drops it for a neutral ground and white glyph, both shades measured off the system's own icons;
+  Tinted uses the icon colour selected in macOS. A preset uses the system swatch for the tile's shade,
+  a custom colour uses its saved RGBA components, and Automatic colour uses the accent. An Automatic
+  shade follows the surface the tile sits on. The gradient and preset swatches live in `Theme.IconTile`.
 - **Built-in entries** declare the tint beside the symbol: `SettingsTab.systemImage` and `.tint`,
-  `CommandID.sfSymbol` and `.tint`, `SystemActionCatalog.symbol(for:)` and `tint(for:)`. The switches
-  are exhaustive, so a new case fails the build until it has both.
+  `CommandID.sfSymbol` and `.tint`, `SystemActionCatalog.symbol(for:)` and `tint(for:)`,
+  `SyncCategory` and `SyncExclusion`'s `.symbol` and `.tint`, `BackupCategory.descriptor`. The
+  switches are exhaustive, so a new case fails the build until it has both.
 - **User-made entries** keep the symbol the user picked and take their feature tab's tint:
   `SettingsTab.quicklinks.tint` for a quicklink, `.windowManagement` for window commands, layouts and
   rooms, `.extensions` for an extension's icon override. There is no colour to choose. Each feature's
@@ -455,6 +465,14 @@ the way System Settings draws its sidebar. The Settings sidebar uses the same ti
   same tile. `AppEntry.iconSource` turns either kind into `EntryIcon.tile`.
 - **Not in the pack.** Clipboard rows keep the plain tile, since their glyph names the content's type.
   Menus, icon pickers, dialogs, HUDs, the compact bar and menu-bar items draw the symbol with no tile.
+- **Settings list rows** draw a tile through `SettingsSymbolTile`: `.row` at an app icon's body size
+  so it matches the app icons in other lists, `.feature` at a feature switch's size for a row with a
+  subtitle. A Settings list of user-made items, window commands or quick actions draws the same
+  symbol and tint as the launcher row; a custom command or quicklink row has no subtitle. The
+  Permissions pane's rows are `.feature`: Accessibility takes the Permissions tab's tint, Full Disk
+  Access gray, and Calendars and Microphone the Calendar and Dictation tabs' tints. iCloud Sync gives a
+  row for a whole feature that feature's tab icon, and a row for part of one its own symbol in that
+  feature's tint; General settings are gray. The Backup pane's checkbox grids follow the same rule.
 - **Vector only.** `IconCache` cannot draw the rounded design off-main, so `AppIconView` draws
   `EntryIcon.tile` itself; a bitmap consumer of one gets the plain symbol tile.
 
@@ -465,9 +483,8 @@ the way System Settings draws its sidebar. The Settings sidebar uses the same ti
    `Assets.xcassets`, as `bluetooth` is.
 2. Pick the tint of the feature it belongs to. Add a new `IconTint` (and its pair in
    `Theme.IconTile.fill(_:)`) only for a new feature whose sidebar neighbours use every fitting one.
-3. Add both to the catalog's switches, next to the case.
-4. Add the row to the artifact's `icons.js`, render its preview with `tools/render-symbols.swift.txt`,
-   and republish, so the reference stays complete.
+3. Add both to the catalog's switches, next to the case. A surface with no catalog, such as the
+   Permissions pane, states the pair where it draws the tile.
 
 ## Rows, selection, hover
 
@@ -477,7 +494,7 @@ Source: `Launcher/UI/LauncherList.swift`, `Clipboard/UI/ClipboardView.swift`,
 All lists share one row grammar so launcher and clipboard look identical:
 
 - `HStack(spacing: lg)`: leading 26pt icon/thumbnail, title (`.body`, `lineLimit(1)`), optional trailing keycaps/kind label, `Spacer`. Insets: `.horizontal md`, `.vertical sm`.
-- **The palette result slot is always `Theme.Size.resultRowIcon`, whatever fills it.** A glyph smaller than an app icon (the uninstall list's 16pt checkbox) is centred _inside_ that 26pt slot rather than sizing the slot to itself. Every list then starts its title at the same x, so switching palette modes doesn't jog the column sideways. The slot doubles as the hit target. Settings keeps the existing 24pt `rowIcon`.
+- **The palette result slot is always `Theme.Size.resultRowIcon`, whatever fills it.** A glyph smaller than an app icon (the uninstall list's 16pt checkbox) is centred _inside_ that 26pt slot rather than sizing the slot to itself. Every list then starts its title at the same x, so switching palette modes doesn't jog the column sideways. The slot doubles as the hit target. A Settings list keeps its own 25pt `SettingsListMetrics.iconSize`, whose icon body matches a sidebar tile.
 - Clipboard thumbnails use `IconCache.appIconExtent` within that slot. A symbol entry draws its [icon pack](#icon-pack) tile at an app icon's body size.
 - Background is a `RoundedRectangle(row, .continuous)` filled by `fill`: **selection → hover → clear**, in that precedence. This `fill` computed property is copy-identical across `AppRow`, `ClipboardRow` and `UninstallRow`; keep them in sync. The launcher's lead cards don't restate it: `.leadCard(selected:)` (`Features/Launcher/UI/LeadCard.swift`) owns their fill and hover, so a card can't answer a selection differently from its siblings.
 - **Hover state lives on the row**, not the list, so a mouse sweep repaints only the rows entering/leaving (a list-level hover rebuilds every row per move; don't do that).
@@ -485,8 +502,6 @@ All lists share one row grammar so launcher and clipboard look identical:
 - **Scroll moves only on keyboard nav/reset**, driven by a `ScrollIntent` (`DesignSystem/Scrolling/ScrollIntent.swift`); mouse selection targets a visible row and never yanks scroll. `.top` scrolls to the origin anchor that `scrollOriginAnchor()` installs: a zero-height overlay applied to the scrolled content _after_ its padding, so it marks offset 0 without joining the layout and the restored origin is exact (targeting the first row instead leaves the top padding hidden under the header); it is restated when the header's inset settles after mount, which moves the resting offset. A `.follow` that lands on flat index 0 restores the origin instead, so that row's section header comes back into view. A reset lands on the screen's `landingSelection` through `RootPaletteView.land()`: row 0 takes `.top`; a later row takes `.center`, which brings a row the lazy stack has not built in by id, centres it once its frame is measured and then lets go (restated, like `.top`, when the inset settles). One intent state serves every mode; they never coexist.
 - **`.follow` is an invariant, not a command** (`scrollFollowsSelection`, `DesignSystem/Scrolling/`). Each list marks its selected row with `selectionFrame(_:)`, and the modifier keeps that row inside the band between the floating bars, re-checking as the geometry and the row's frame settle, then **stops watching the moment the row is inside**. That self-release is what keeps it safe: once a keystroke has landed nothing is observing, so a wheel scroll (or a scrollbar-thumb drag, which `onScrollPhaseChange` cannot see at all) is never pulled back. Two measured facts it rests on: `frame(in: .scrollView)` reports the _inset-excluded_ space, so the band is simply `0…containerSize.height`; and SwiftUI's minimal scroll-to-visible counts the strip behind the bottom bar as visible while its _destination_ math respects the insets. Hence the split: Tinycast decides **whether** to scroll (`SelectionReveal`, pure, pinned by `Tests/ScrollRevealTests.swift`) and SwiftUI performs the move with an explicit `.top`/`.bottom` anchor. Scroll far by hand and the lazy stack drops the selected row, so there is no frame to measure at all: the fallback brings it back by id and the invariant, still standing, re-checks the moment it reports, which is why arrowing after a long mouse scroll lands the selection on screen rather than moving it out of sight. A one-shot `scrollTo` here left the highlight stranded under the pill whenever the target row's layout was not yet known, with nothing looking again until the next key press. **The id passed to `scrollFollowsSelection` must be the lazy container's own `ForEach` identity**: an `.id()` applied inside a row registers only once that row has been realized, which is exactly when scrolling to it is unnecessary, and the fallback that brings a dropped row back by id then has nothing to aim at.
 - **Keycaps** use `KeyCapChip`: `.outline` (white-0.20 border) for hotkey hints on rows, `.filled` (white-0.10 fill) for footer shortcuts.
-  Symbol legends (🎤 → `mic`) use `Text(Image(systemName:))` to inherit the cap's font. A shortcut
-  printed as text goes through `KeyCapChip.inlineText`, never `keycaps.joined()`.
 
 ### Section headers
 
@@ -587,9 +602,11 @@ alike.
   **↵ runs the dialog's primary action; Escape cancels**, on every dialog including destructive ones.
   Arrow keys walk the volume slider along the same 5% grid the volume commands use (`DialogPanel`
   reports `.increment` / `.decrement` and `DialogController` applies `VolumeLevel.stepped`, so the
-  panel never learns what a volume step is); click-away resolves as a dismissal. ↵ that commits an
-  input method's marked text never confirms, and a multi-line accessory takes ↵ as a line break, so
-  its dialog confirms on ⌘↵ and its default button advertises that instead.
+  panel never learns what a volume step is); click-away resolves as a dismissal. A snippet's
+  argument prompt claims ⇥/⇧⇥ through `claimsTabKey`, so focus walks its fields in order and wraps,
+  and ↑/↓ move the focused options list's choice. ↵ that commits an input method's marked text never
+  confirms, and a multi-line accessory takes ↵ as a line break, so its dialog confirms on ⌘↵ and its
+  default button advertises that instead.
 - **Async, not modal.** Presentation is `async` (`withCheckedContinuation`), so there is no nested run
   loop. A held hotkey can't stack dialogs: while one is up, a second request resolves immediately as a
   dismissal, which is why the old `isConfirmingCommand` re-entrancy flag is gone.
@@ -713,17 +730,22 @@ it would couple two unrelated surfaces.
 
 A dialog carries at most one control beyond its buttons, and `DialogAccessory` makes that structural
 rather than a convention: `.volume` for the Set Volume prompt, `.snippetArguments` for a snippet's
-`{argument}` values and `.clipboardText` for Edit Entry. Text fields take `dialogTextField()`;
-inline enumerated arguments are `DialogChip`s. `DialogPanel.handlesArrowKeys` is set from
-`DialogAccessory.claimsArrowKeys`, so the slider steps on ←/→ while snippet argument text fields
-keep their caret, and `acceptsLineBreaks` from the accessory of the same name, so only Edit Entry's
-`dialogTextHeight` text area takes ↵. Create Event uses the launcher form instead.
+`{argument}` values and `.clipboardText` for Edit Entry. Text fields take `dialogTextField()`; an
+`options=` argument is a list of `dialogButtonHeight` rows that scrolls past `menuVisibleRows`, its
+choice checked and filled with `selection` while the list has focus. A prompt of lists alone uses
+`dialogCompactWidth`, and a lone unnamed argument drops its label. `DialogPanel.handlesArrowKeys`
+is set from `DialogAccessory.claimsArrowKeys`, so the slider steps on ←/→ while snippet argument
+text fields keep their caret, and `acceptsLineBreaks` from the accessory of the same name, so only
+Edit Entry's `dialogTextHeight` text area takes ↵. Create Event uses the launcher form instead.
 
 The first text field or text view takes focus from `DialogController.windowDidBecomeKey`, never from
-the view. When the panel turns key AppKit picks its own first responder (the Cancel button with
-Keyboard navigation on), and over another app that happens only after `show` returns, so focus a
-SwiftUI view asks for loses to it. The panel can also turn key inside `makeKeyAndOrderFront`, before
-SwiftUI has built the field, so `DialogPanel.focusFirstTextField` lays the content out first.
+the view. A snippet prompt that opens on an options list sets `SnippetArgumentsState.focusedIndex`
+there instead, which its view mirrors into a `FocusState`; a SwiftUI request to focus a text field
+there is lost, so a leading text field still goes through `focusFirstTextField`. When the panel turns key
+AppKit picks its own first responder (the Cancel button with Keyboard navigation on), and over
+another app that happens only after `show` returns, so focus a SwiftUI view asks for loses to it.
+The panel can also turn key inside `makeKeyAndOrderFront`, before SwiftUI has built the field, so
+`DialogPanel.focusFirstTextField` lays the content out first.
 
 ## Settings
 

@@ -473,6 +473,18 @@ and makes the extension a keyword for every command it ships: `lucide` finds _Se
 matched in the launcher's weakest literal band, so a third-party title can never take a query from a
 real app; see [launcher.md](launcher.md#owner-names).
 
+## The Settings pane
+
+Settings runs in its own process (see [architecture.md](../architecture.md#the-settings-process)), and
+extensions never run there. The pane reads `ExtensionLibrary`: the installed set scanned from disk,
+rescanned when the main app's set moves, and the updates, appearances and per-command metadata the main app
+mirrors in `MainAppStatus`. Every change is the main app's: installs, imports, updates and uninstalls are
+`ExtensionCall`s the pane awaits, with progress on the way, and appearance, background, menu-bar and
+preference edits are `SettingsAction`s. Settings' process never writes extension storage, so a
+running command's own writes cannot be overwritten; it asks the questions (consent, uninstall,
+cleanup) and clears build leftovers itself, since those are files only. A later extensions process
+sits behind the same calls, with no change to the pane.
+
 ## Installing extensions
 
 Extensions live in `~/Library/Application Support/<bundle id>/extensions/<name>/`, keyed by bundle id
@@ -593,7 +605,7 @@ preferences, storage and icon carry over.
 other Macs, found again by handle and name, and installs one only where Extensions is on. An
 uninstall reaches every Mac syncing extensions, and its confirmation says so. Text, checkbox and
 dropdown preferences travel; passwords, file and folder paths, local storage and OAuth tokens stay.
-Which commands show in the launcher stays per Mac, as in Raycast.
+Which commands show in the launcher stays per Mac.
 
 ## Shortcuts
 

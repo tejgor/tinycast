@@ -6,8 +6,8 @@ them and nothing else: creating, editing, permissions and the actions themselves
 
 The feature ships **off**. **Settings → Apple Shortcuts** carries the one switch, and lists the
 library only while it is on. Off is fully off: the `shortcuts` tool is never spawned, the launcher
-section is empty, and `AppleShortcutCoordinator.run(id:)` refuses to run anything. Bindings stay
-registered, so re-enabling restores every global shortcut.
+section is empty, and `AppleShortcutCoordinator.run(id:)` refuses to run anything. Global shortcuts
+leave Carbon while it is off, and re-enabling registers them again.
 
 ## Invariants
 
@@ -60,7 +60,9 @@ shortcut's references linger until the library holds one again.
 `shortcuts run <uuid>` runs the shortcut headless. The palette hides first and hands focus back, since
 a shortcut usually acts on the app the user was in. There is **no timeout**: a shortcut can wait on a
 dialog of its own for as long as it likes. Success is silent; a non-zero exit shows the tool's last
-lines in Tinycast's own dialog.
+lines in Tinycast's own dialog. A run the user stops at one of the shortcut's own prompts (Esc on
+Choose from List, say) is silent too: the tool ends it with `Running was cancelled`, a fixed English
+line it never localizes, and the runner treats that as a stop rather than a failure.
 
 ## Launcher and Settings
 

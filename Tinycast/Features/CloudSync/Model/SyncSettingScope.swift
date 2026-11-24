@@ -25,7 +25,7 @@ enum SyncSettingScope {
             .clipboardEnabled:
             nil
         case .showInMenuBar: .showInMenuBar
-        case .appearance, .animationsEnabled, .paletteTransparency: .appearance
+        case .appearance, .animationsEnabled, .iconStyle, .paletteTransparency: .appearance
         case .interfaceSize: .interfaceSize
         case .compactMode, .compactBarCommands: .windowMode
         case .aiSystemPrompt, .aiSystemPromptEnabled: .aiCommands

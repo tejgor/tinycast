@@ -2,7 +2,7 @@ import Foundation
 
 /// One `Section` inside a pane, named once so the catalog and the pane cannot disagree: the search
 /// result carries the anchor, the pane's `.settingsAnchor(_:)` marks the section it scrolls to.
-struct SettingsAnchor: Hashable, Sendable {
+struct SettingsAnchor: Hashable, Codable, Sendable {
     let tab: SettingsTab
     /// The `Section`'s own header text, which is also what a result's breadcrumb reads.
     let title: String
@@ -133,6 +133,7 @@ extension SettingsAnchor {
     static let iCloudSyncMacs = Self(tab: .iCloudSync, title: "Macs")
     static let iCloudSyncData = Self(tab: .iCloudSync, title: "iCloud Data")
     static let backupExport = Self(tab: .backup, title: "Export")
+    static let backupNotIncluded = Self(tab: .backup, title: "Not Included")
     static let backupImport = Self(tab: .backup, title: "Import")
     static let backupImportFromRaycast = Self(tab: .backup, title: "Import from Raycast")
     static let backupSettingsFile = Self(tab: .backup, title: "Settings File")
@@ -141,7 +142,7 @@ extension SettingsAnchor {
     static let aboutLinks = Self(tab: .about, title: "Links")
 }
 
-enum SettingsTarget: Hashable, Sendable {
+enum SettingsTarget: Hashable, Codable, Sendable {
     case section(SettingsAnchor)
     /// The row's visible title, which is also the catalog entry's — they are the same string.
     case row(SettingsAnchor, String)

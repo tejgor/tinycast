@@ -141,6 +141,9 @@ enum SettingsSearchCatalog {
             .generalAppearance, "Appearance",
             keywords: ["dark", "light", "mode", "theme"]),
         .init(
+            .generalAppearance, "Icon style",
+            keywords: ["icons", "colorful", "clear", "tinted", "dark", "widget", "theme"]),
+        .init(
             .generalAppearance, "Transparency",
             keywords: ["glass", "translucent", "see through", "opacity", "blur", "background"]),
         .init(
@@ -676,9 +679,11 @@ enum SettingsSearchCatalog {
         .init(.iCloudSyncSwitch, "Sync with iCloud", keywords: ["turn on", "enable", "sync"]),
         .init(
             group: .iCloudSyncContent, "Synced Content",
-            keywords: ["notes", "snippets", "quicklinks", "chats", "extensions", "presets"]),
+            keywords: [
+                "notes", "snippets", "quicklinks", "chats", "extensions", "presets", "clipboard", "images"
+            ]),
         .init(group: .iCloudSyncGeneral, "Synced Settings", keywords: ["appearance", "login", "menu bar"]),
-        .init(group: .iCloudSyncNotSynced, "Not Synced", keywords: ["clipboard", "passwords", "excluded"]),
+        .init(group: .iCloudSyncNotSynced, "Not Synced", keywords: ["copied files", "passwords", "excluded"]),
         .init(group: .iCloudSyncMacs, "Synced Macs", keywords: ["devices", "remove", "rename", "computers"]),
         .init(.iCloudSyncData, "Delete iCloud Data", keywords: ["reset", "erase", "remove", "cloud data"])
     ]
@@ -690,6 +695,9 @@ enum SettingsSearchCatalog {
         .init(
             .backupExport, "Export Backup",
             keywords: ["save", "tinycast file", "archive"]),
+        .init(
+            group: .backupNotIncluded, "Not Included",
+            keywords: ["excluded", "extensions", "chats", "passwords", "api keys"]),
         .init(
             .backupImport, "Backup File",
             keywords: ["restore", "choose", "tinycast file"]),

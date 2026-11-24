@@ -6,7 +6,6 @@ import Observation
 @Observable
 final class NotesLocalState {
     private enum Key {
-        static let autoSizesWindow = "notesWindowAutoSizes"
         static let zoom = "notesZoom"
         static let pinned = "notesPinned"
         static let lastOpened = "notesLastOpened"
@@ -16,11 +15,6 @@ final class NotesLocalState {
     static let zoomSteps: [Double] = [0.75, 0.85, 1, 1.15, 1.3, 1.5, 1.75, 2]
 
     @ObservationIgnored private let defaults: UserDefaults
-
-    /// The window follows the note's height until the user sizes it by hand.
-    var autoSizesWindow: Bool {
-        didSet { defaults.set(autoSizesWindow, forKey: Key.autoSizesWindow) }
-    }
 
     var zoom: Double {
         didSet { defaults.set(zoom, forKey: Key.zoom) }
@@ -41,7 +35,6 @@ final class NotesLocalState {
 
     init(defaults: UserDefaults) {
         self.defaults = defaults
-        autoSizesWindow = defaults.object(forKey: Key.autoSizesWindow) as? Bool ?? true
         let storedZoom = defaults.double(forKey: Key.zoom)
         zoom = Self.zoomSteps.contains(storedZoom) ? storedZoom : 1
         pinned = (defaults.stringArray(forKey: Key.pinned) ?? []).map(NoteID.init(rawValue:))

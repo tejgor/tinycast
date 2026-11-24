@@ -90,7 +90,8 @@ locally on one Mac. Everything in `AGENTS.md` still applies; this file only adds
 - A Table button in the Notes formatting bar inserts an empty three-column table
   (`NoteEditAction.insertTable`); the minimum note window grew from 440 to 470 points to fit it.
 - Notes behaves more like Raycast Notes (see `docs/features/notes.md`):
-  - a hand-sized window keeps its size (`NotesLocalState.autoSizesWindow`), and planned edits such as
+  - the ⌘K panel toggles upstream's window fitting (`NotesCoordinator.fitsWindowToNote`, which
+    replaced the fork's own hand-sized-window flag), and planned edits such as
     Return in a list scroll the caret into view;
   - ⌘L link, ⇧⌘S strikethrough, ⌘↵ checkbox, ⌘[ / ⌘] history (`NoteHistory`), ⌘+ / ⌘− / ⌘0 zoom,
     Duplicate Note, Delete All Notes (the fork's click-to-toggle count gave way to upstream's

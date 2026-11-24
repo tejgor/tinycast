@@ -15,13 +15,13 @@ selectable Markdown renderer with AI Chat.
 ## Invariants
 
 - **Off out of the box, and off means the shortcuts do nothing.** `AppSettings.quickActionsEnabled`
-  is the flag and `QuickActionCoordinator` is the only place that reads it: no selection is read, no
-  provider is built, no panel opens. The four commands leave the launcher's Quick Actions slice
+  is the flag and `QuickActionCoordinator` refuses every run while it is off: no selection is read,
+  no provider is built, no panel opens. The four commands leave the launcher's Quick Actions slice
   through `AppIndex.setCommandsVisible`, and the custom ones leave it through
-  `AppIndex.setCustomQuickActions`, the way Notes and AI Chat drop theirs. Carbon bindings stay
-  registered, so re-enabling restores every shortcut without touching the hotkey layer. The flag
-  grants keystroke delivery into other apps, so like `snippetsEnabled` it is excluded from settings
-  backups; an import must never arm it.
+  `AppIndex.setCustomQuickActions`, the way Notes and AI Chat drop theirs.
+  `AppCore.allowsHotKeyAction` also reads the flag, so their shortcuts leave Carbon while it is off
+  and return when it is on. The flag grants keystroke delivery into other apps, so like
+  `snippetsEnabled` it is excluded from settings backups; an import must never arm it.
 - **One funnel, whichever way an action started.** A shortcut and a launcher row both land on
   `QuickActionCoordinator.run(_:)`, which captures the target **before** hiding the palette. An
   external app remains the usual target; a selected passage in the Notes editor is captured directly
@@ -122,7 +122,7 @@ takes the choice with it.
 `VisibilityStore.allowsHotKey` because `quickActionsEnabled` is the master switch. The four keep their
 `CommandID`s, so no shortcut or preference key moved. A custom action binds
 `HotKeyAction.quickAction(id:)` under `hotkey.quickAction.<uuid>`, indexed in `boundQuickActionIDs` so
-`HotKeyManager.start` can prune a binding whose action was deleted while Tinycast was off.
+`HotKeyManager.load` can prune a binding whose action was deleted while Tinycast was off.
 
 **The pane draws its own `AliasField`.** The four are named in `SettingsTab.ownedCommands`, so
 Settings → Commands no longer draws theirs. Without it, `deleteCustomQuickAction` would be clearing an
@@ -152,11 +152,22 @@ nothing on every route, and a 3B model is markedly worse at it. `NLLanguageRecog
 source language, because `TranslationSession(installedSource:target:)` needs a concrete one and
 `LanguageAvailability` reports only a status.
 
+**The reader's own languages weigh twenty times more.** The recognizer misreads single words:
+`reproducible` scores 0.92 Spanish and `conundrum` reads as Portuguese, so a Mac with only English and
+the target downloaded was told to download a language the text was never in. Every hypothesis in a
+language from macOS's preferred list (`SystemLanguages`, not Tinycast's own interface language) is
+multiplied by `readerLanguageOdds` before the likeliest wins. A foreign sentence keeps its language,
+because it leaves the reader's languages near zero.
+
 **A download is a locale, not a language.** Apple matches `en-US` and `en-GB` separately, so the bare
 `en` the recognizer reports finds only the first and calls an installed `en-GB` pair missing, which
 read as _Chinese hasn't been downloaded yet_ on a Mac that had Chinese. Both sides are retried across
 every supported spelling of the same script before the panel names a language, and the language it
 names is the one with no downloaded asset of its own.
+
+**Text already in the target language comes back unchanged**, whatever its region. The recognizer
+reports Arabic as `ar-EG` and English as `en-US`, and the translator calls a pair that differs only by
+region unsupported, so the check compares language and script, never region.
 
 `TranslationError` is annotated `macOS 26.4` while the deployment floor is `26.0`, so failures are
 caught as plain `Error` and reported by what was asked rather than by matching its cases.
@@ -170,7 +181,8 @@ Names come from `minimalIdentifier`; the maximal form carries the script, and `e
 "Spanish (Latin, Spain)" in a menu that should say "Spanish".
 
 A pair that is supported but not downloaded **opens the panel**, whatever the action's usual result,
-so a shortcut never silently does nothing. **The download happens in System Settings.**
+so a shortcut never silently does nothing. It names the language `TextTranslator` found missing, which
+is the source as often as the target. **The download happens in System Settings.**
 `prepareTranslation` never showed its sheet over this non-activating panel, so the prompt says where
 to go (Language & Region → Translation Languages…) and its one button opens that pane and closes
 the panel. System Settings has no anchor for the sheet itself, so the last click stays the reader's.
@@ -309,6 +321,10 @@ failure handler, so automatic expansion stays silent as before.
   translate rather than call the target language missing.
 - Translate Korean text with Korean not downloaded and the target language installed: the panel names
   Korean, the language that is actually missing.
+- With only English and the target downloaded, translate the single words `reproducible` and
+  `conundrum`: both translate as English rather than asking for Spanish or Portuguese.
+- Translate Arabic text into Arabic (Saudi Arabia), or English text into English (UK): the panel shows
+  the text unchanged rather than calling the pair unsupported.
 - Revoke Accessibility while enabled: a HUD explains instead of failing silently.
 - Harnesses: `QuickActionTests` (action metadata, prompt boundaries, preview choices, routes and
   their repair) and
